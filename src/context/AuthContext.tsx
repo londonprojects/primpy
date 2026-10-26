@@ -31,8 +31,13 @@ import type { AppUser, UserRole } from '../types';
 interface AuthContextValue {
   user: AppUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<AppUser>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+    opts?: { role?: UserRole; shopName?: string },
+  ) => Promise<void>;
   /** Returns true when this created a new Primpy account. */
   signInWithSocial: (provider: 'google' | 'apple') => Promise<boolean>;
   /** Applies an emailed verify-email action code. */
@@ -70,18 +75,32 @@ async function loadProfile(fbUser: FirebaseUser): Promise<AppUser> {
   };
 }
 
-/** Create a matching `users` profile so Primpy users exist in the shared backend. */
-async function ensureProfile(fbUser: FirebaseUser, displayName: string): Promise<boolean> {
+/**
+ * Create a matching `users` profile so Primpy users exist in the shared backend.
+ * A business account uses role `barber` + `shopName` so it appears as a venue,
+ * matching the Snip data model.
+ */
+async function ensureProfile(
+  fbUser: FirebaseUser,
+  displayName: string,
+  role: UserRole = 'customer',
+  shopName?: string,
+): Promise<boolean> {
   const ref = doc(db, 'users', fbUser.uid);
   const snap = await getDoc(ref);
   if (snap.exists()) return false;
-  await setDoc(ref, {
+  const data: Record<string, unknown> = {
     displayName,
     email: fbUser.email ?? '',
-    role: 'customer' as UserRole,
+    role,
     createdAt: new Date().toISOString(),
     source: 'primpy-web',
-  });
+  };
+  if (role === 'barber' && shopName) {
+    data.shopName = shopName;
+    data.barberServices = [];
+  }
+  await setDoc(ref, data);
   return true;
 }
 
@@ -107,14 +126,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (auth.currentUser && !auth.currentUser.isAnonymous) setUser(await loadProfile(auth.currentUser));
   };
 
-  const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const signIn = async (email: string, password: string): Promise<AppUser> => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const profile = await loadProfile(cred.user);
+    setUser(profile);
+    return profile;
   };
 
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName: string,
+    opts?: { role?: UserRole; shopName?: string },
+  ) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await fbUpdateProfile(cred.user, { displayName });
-    await ensureProfile(cred.user, displayName);
+    await ensureProfile(cred.user, displayName, opts?.role, opts?.shopName);
     await sendEmailVerification(cred.user, actionSettings()).catch(() => undefined);
     setUser(await loadProfile(cred.user));
   };

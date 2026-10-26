@@ -62,7 +62,13 @@ export default function AuthModal({ options, onClose }: { options: AuthOptions; 
   const login = () =>
     pw
       ? run(async () => {
-          await signIn(email.trim(), pw);
+          const u = await signIn(email.trim(), pw);
+          // Send business accounts straight to their dashboard on a plain login.
+          if (!options.onSuccess && !options.hold && (u.role === 'barber' || u.role === 'admin')) {
+            onClose();
+            navigate('/business');
+            return;
+          }
           done({ isNew: false, social: false });
         })
       : setError('Enter your password.');

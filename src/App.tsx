@@ -25,6 +25,11 @@ import OnboardingPage from './pages/OnboardingPage';
 import VerifyPage from './pages/VerifyPage';
 import ResetPage from './pages/ResetPage';
 import NotFoundPage from './pages/NotFoundPage';
+import BusinessRoute from './components/BusinessRoute';
+import BusinessSignupPage from './pages/business/BusinessSignupPage';
+import BusinessBookingsPage from './pages/business/BusinessBookingsPage';
+import BusinessTreatmentsPage from './pages/business/BusinessTreatmentsPage';
+import BusinessProfilePage from './pages/business/BusinessProfilePage';
 import { bookUrl } from './utils/booking';
 
 function ScrollToTop() {
@@ -85,6 +90,14 @@ export default function App() {
           <Route path="/reset" element={<ResetPage />} />
           <Route path="/login" element={<AuthRoute />} />
           <Route path="/register" element={<AuthRoute />} />
+
+          {/* Business (venue) side */}
+          <Route path="/business/signup" element={<BusinessSignupPage />} />
+          <Route path="/business" element={<Navigate to="/business/bookings" replace />} />
+          <Route path="/business/bookings" element={<BusinessRoute><BusinessBookingsPage /></BusinessRoute>} />
+          <Route path="/business/treatments" element={<BusinessRoute><BusinessTreatmentsPage /></BusinessRoute>} />
+          <Route path="/business/profile" element={<BusinessRoute><BusinessProfilePage /></BusinessRoute>} />
+
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

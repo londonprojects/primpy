@@ -108,6 +108,19 @@ export async function cancelAppointment(id: string): Promise<void> {
   await updateDoc(doc(db, COLLECTION, id), { status: 'cancelled' });
 }
 
+/** Bookings for a venue (business side) — rows where `barberId` is the venue uid. */
+export async function fetchVenueBookings(venueId: string): Promise<Appointment[]> {
+  const q = query(collection(db, COLLECTION), where('barberId', '==', venueId));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((s) => mapAppointment(s.id, s.data() as Record<string, unknown>))
+    .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+}
+
+export async function setAppointmentStatus(id: string, status: Appointment['status']): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, id), { status });
+}
+
 /** Move a booking to a new slot. Same doc, so Snip sees the change. */
 export async function rescheduleAppointment(id: string, date: string, time: string): Promise<void> {
   await updateDoc(doc(db, COLLECTION, id), {

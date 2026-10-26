@@ -36,9 +36,20 @@ export default function Header() {
                 <button className="nav-link" onClick={() => navigate('/search')}>
                   Explore
                 </button>
-                <button className="nav-link" onClick={() => navigate('/appointments')}>
-                  My bookings
-                </button>
+                {user && (user.role === 'barber' || user.role === 'admin') ? (
+                  <button className="nav-link" onClick={() => navigate('/business')}>
+                    Dashboard
+                  </button>
+                ) : (
+                  <>
+                    <button className="nav-link" onClick={() => navigate('/appointments')}>
+                      My bookings
+                    </button>
+                    <button className="nav-link" onClick={() => navigate('/business/signup')}>
+                      For business
+                    </button>
+                  </>
+                )}
                 {user ? (
                   <button className="avatar-chip" title="Account" onClick={() => navigate('/account')}>
                     <span>{user.displayName[0]?.toUpperCase()}</span>
