@@ -6,6 +6,8 @@ export interface Category {
   /** Keywords matched (case-insensitive) against treatment/venue text. */
   keywords: string[];
   image: string;
+  /** One-line intro on the category landing page. */
+  blurb: string;
 }
 
 export const categories: Category[] = [
@@ -15,6 +17,7 @@ export const categories: Category[] = [
     emoji: '💇',
     keywords: ['hair', 'haircut', 'cut', 'blow', 'color', 'colour', 'highlight', 'balayage', 'style', 'styling', 'barber'],
     image: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?w=600&q=70',
+    blurb: 'Cuts, colour and blow-dries from stylists who actually listen.',
   },
   {
     id: 'nails',
@@ -22,6 +25,7 @@ export const categories: Category[] = [
     emoji: '💅',
     keywords: ['nail', 'manicure', 'pedicure', 'gel', 'acrylic', 'mani', 'pedi'],
     image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=600&q=70',
+    blurb: 'Gel, BIAB and nail art — quick, clean and long-lasting.',
   },
   {
     id: 'massage',
@@ -29,6 +33,7 @@ export const categories: Category[] = [
     emoji: '💆',
     keywords: ['massage', 'swedish', 'deep tissue', 'sports massage', 'reflexology', 'hot stone'],
     image: 'https://images.unsplash.com/photo-1600334129128-685c5582fd35?w=600&q=70',
+    blurb: 'Swedish, deep tissue and hot stone. Book the knots out.',
   },
   {
     id: 'facials',
@@ -36,6 +41,7 @@ export const categories: Category[] = [
     emoji: '🧖',
     keywords: ['facial', 'skin', 'peel', 'microdermabrasion', 'dermaplaning', 'cleanse'],
     image: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=600&q=70',
+    blurb: 'Results-led facials and skin treatments from qualified therapists.',
   },
   {
     id: 'brows',
@@ -43,13 +49,15 @@ export const categories: Category[] = [
     emoji: '👁️',
     keywords: ['brow', 'eyebrow', 'lash', 'lashes', 'tint', 'lamination', 'threading'],
     image: 'https://images.unsplash.com/photo-1583001931096-959e9a1a6223?w=600&q=70',
+    blurb: 'Lamination, threading, lifts and tints for natural-looking definition.',
   },
   {
     id: 'waxing',
-    name: 'Waxing & Hair Removal',
+    name: 'Waxing',
     emoji: '🪒',
     keywords: ['wax', 'waxing', 'hair removal', 'laser', 'sugaring'],
     image: 'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?w=600&q=70',
+    blurb: 'Gentle hot wax and smooth results, done quickly.',
   },
   {
     id: 'makeup',
@@ -57,6 +65,7 @@ export const categories: Category[] = [
     emoji: '💄',
     keywords: ['makeup', 'make-up', 'make up', 'bridal', 'glam'],
     image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=600&q=70',
+    blurb: 'Event and bridal make-up that lasts all night.',
   },
   {
     id: 'spa',
@@ -64,6 +73,7 @@ export const categories: Category[] = [
     emoji: '🌿',
     keywords: ['spa', 'sauna', 'wellness', 'treatment', 'body', 'aromatherapy'],
     image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=600&q=70',
+    blurb: 'Saunas, plunges and full-body rituals to properly switch off.',
   },
 ];
 

@@ -1,47 +1,62 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUi } from '../context/UiContext';
+import { useInbox } from '../hooks/useInbox';
+import { useNarrow, useOnline } from '../hooks/useMedia';
+import { firstName } from '../utils/format';
+import Logo from './Logo';
 
 export default function Header() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const { openAuth } = useUi();
+  const { unreadCount } = useInbox();
+  const narrow = useNarrow();
+  const online = useOnline();
   const navigate = useNavigate();
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
-
   return (
-    <header className="header">
-      <div className="container header-inner">
-        <Link to="/" className="logo">
-          Primpy<span className="dot">.</span>
-        </Link>
-        <nav className="header-nav">
-          <Link to="/search" className="header-link">
-            Browse
-          </Link>
-          {user ? (
+    <>
+      <header className="header">
+        <div className="wrap header-inner">
+          <Logo onClick={() => navigate('/')} />
+          {!narrow && (
             <>
-              <Link to="/appointments" className="header-link">
-                My bookings
-              </Link>
-              <span className="header-link subtle">Hi, {user.displayName.split(' ')[0]}</span>
-              <button className="btn btn-outline" onClick={handleSignOut}>
-                Sign out
+              <button className="search-pill" onClick={() => navigate('/search')}>
+                <i />
+                Search treatments or venues
               </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="header-link">
-                Log in
-              </Link>
-              <Link to="/register" className="btn btn-primary">
-                Sign up
-              </Link>
+              <nav className="nav">
+                <button className="nav-link" onClick={() => navigate('/saved')}>
+                  Saved
+                </button>
+                <button className="nav-link" onClick={() => navigate('/inbox')}>
+                  Inbox
+                  {unreadCount > 0 && <span className="unread">{unreadCount}</span>}
+                </button>
+                <button className="nav-link" onClick={() => navigate('/search')}>
+                  Explore
+                </button>
+                <button className="nav-link" onClick={() => navigate('/appointments')}>
+                  My bookings
+                </button>
+                {user ? (
+                  <button className="avatar-chip" title="Account" onClick={() => navigate('/account')}>
+                    <span>{user.displayName[0]?.toUpperCase()}</span>
+                    {firstName(user.displayName)}
+                  </button>
+                ) : (
+                  <button className="btn btn-teal btn-sm h44" style={{ fontSize: 15, padding: '0 20px', marginLeft: 6 }} onClick={() => openAuth()}>
+                    Log in
+                  </button>
+                )}
+              </nav>
             </>
           )}
-        </nav>
-      </div>
-    </header>
+        </div>
+      </header>
+      {!online && (
+        <div className="offline">You're offline — showing your saved bookings. We'll sync when you're back.</div>
+      )}
+    </>
   );
 }
