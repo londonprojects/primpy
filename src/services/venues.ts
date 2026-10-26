@@ -6,7 +6,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { authReady, db } from '../firebase';
 import type { Treatment, Venue } from '../types';
 import { categories, categoriesForText, categoryById } from '../config/categories';
 
@@ -149,7 +149,8 @@ let venuesCache: Promise<Venue[]> | null = null;
 export function fetchVenues(force = false): Promise<Venue[]> {
   if (!venuesCache || force) {
     const q = query(collection(db, 'users'), where('role', 'in', ['barber', 'admin']));
-    venuesCache = getDocs(q)
+    venuesCache = authReady()
+      .then(() => getDocs(q))
       .then((snap) =>
         snap.docs
           .map((docSnap) => mapVenue(docSnap.id, docSnap.data() as Record<string, unknown>))
@@ -164,6 +165,7 @@ export function fetchVenues(force = false): Promise<Venue[]> {
 }
 
 export async function fetchVenue(id: string): Promise<Venue | null> {
+  await authReady();
   const ref = doc(db, 'users', id);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;

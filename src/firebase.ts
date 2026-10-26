@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 /**
@@ -19,6 +19,20 @@ const firebaseConfig = {
 export const app: FirebaseApp = initializeApp(firebaseConfig);
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
+
+/**
+ * Snip's rules only allow `users` reads when signed in, so signed-out visitors
+ * get a background anonymous (guest) session. The UI treats guests as signed out.
+ * `authReady()` resolves once some user (guest or real) exists, or once the guest
+ * sign-in has failed (e.g. Anonymous provider disabled), so callers never hang.
+ */
+let markReady: () => void = () => undefined;
+const ready = new Promise<void>((resolve) => (markReady = resolve));
+onAuthStateChanged(auth, (u) => {
+  if (u) markReady();
+  else signInAnonymously(auth).catch(() => markReady());
+});
+export const authReady = (): Promise<void> => ready;
 
 export const API_BASE_URL: string = (
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'

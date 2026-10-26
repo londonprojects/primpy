@@ -92,7 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       try {
-        setUser(fbUser ? await loadProfile(fbUser) : null);
+        // Anonymous guest sessions exist only so browsing can read venues; treat as signed out.
+        setUser(fbUser && !fbUser.isAnonymous ? await loadProfile(fbUser) : null);
       } catch {
         setUser(null);
       } finally {
@@ -103,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = async () => {
-    if (auth.currentUser) setUser(await loadProfile(auth.currentUser));
+    if (auth.currentUser && !auth.currentUser.isAnonymous) setUser(await loadProfile(auth.currentUser));
   };
 
   const signIn = async (email: string, password: string) => {
@@ -164,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (patch: { displayName?: string; email?: string }) => {
     const fbUser = auth.currentUser;
-    if (!fbUser) throw new Error('You’re signed out.');
+    if (!fbUser || fbUser.isAnonymous) throw new Error('You’re signed out.');
     let emailPending = false;
     if (patch.displayName && patch.displayName !== user?.displayName) {
       await fbUpdateProfile(fbUser, { displayName: patch.displayName });
@@ -181,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteAccount = async (beforeDelete?: () => Promise<void>) => {
     const fbUser = auth.currentUser;
-    if (!fbUser) return;
+    if (!fbUser || fbUser.isAnonymous) return;
     // Firebase refuses deletion without a recent sign-in; check first so nothing
     // is cancelled for an account that then can't be deleted.
     const last = Date.parse(fbUser.metadata.lastSignInTime ?? '');
