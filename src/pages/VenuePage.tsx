@@ -4,7 +4,7 @@ import { useVenue } from '../hooks/useVenues';
 import { fetchVenueReviews } from '../services/stubs';
 import { useUserData } from '../context/UserDataContext';
 import type { Review, Treatment, Venue } from '../types';
-import { ratingText } from '../components/VenueCards';
+import { ExampleBadge, ratingText } from '../components/VenueCards';
 import FloatingBar, { BarSpacer } from '../components/FloatingBar';
 import Gallery from '../components/Gallery';
 import { MapPlaceholder, Spinner } from '../components/ui';
@@ -94,7 +94,8 @@ export default function VenuePage() {
                 {closedToday ? 'Closed today' : `Open today · until ${CLOSING_TIME}`}
               </span>
             </div>
-            <h1 className="h-venue">{venue.name}</h1>
+            <h1 className="h-venue">{venue.name}{venue.example && <ExampleBadge />}</h1>
+            {venue.example && <div style={{ marginTop: 6, fontSize: 14, fontWeight: 600 }}>Example venue — not bookable</div>}
             <div style={{ marginTop: 10, fontSize: 16 }}>{venue.address}</div>
           </div>
         </div>
@@ -127,8 +128,9 @@ export default function VenuePage() {
           maxWidth={880}
           title={`${items.length} treatment${items.length === 1 ? '' : 's'} · ${money(total)}`}
           sub={`${fmtDur(dur)} · ${venue.name}`}
-          cta="Choose time"
-          onCta={() => navigate(bookUrl(venue.id, { t: sel }))}
+          cta={venue.example ? 'Example venue — not bookable' : 'Choose time'}
+          disabled={venue.example}
+          onCta={() => !venue.example && navigate(bookUrl(venue.id, { t: sel }))}
         />
       )}
       {galOpen && <Gallery title={venue.name} photos={venue.photos} onClose={() => setGalOpen(false)} />}

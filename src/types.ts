@@ -52,6 +52,8 @@ export interface Venue {
   /** Fraction of the total taken as a deposit (0.2 = 20%). Absent = no deposit. */
   deposit?: number;
   coordinate?: { latitude: number; longitude: number };
+  /** Built-in fictional example (shown only when there are no real venues); not bookable. */
+  example?: boolean;
 }
 
 export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';

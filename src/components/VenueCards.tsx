@@ -32,9 +32,19 @@ export function Heart({ venueId, size = 36 }: { venueId: string; size?: number }
   );
 }
 
+/** Label for built-in example venues. */
+export function ExampleBadge() {
+  return (
+    <span style={{ marginLeft: 8, verticalAlign: 'middle', background: 'var(--amber)', color: 'var(--ink)', borderRadius: 999, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+      Example
+    </span>
+  );
+}
+
 /** Today's next free times; tapping one jumps straight to booking with the first treatment. */
 export function QuickSlots({ venue, pillStyle }: { venue: Venue; pillStyle?: React.CSSProperties }) {
   const navigate = useNavigate();
+  if (venue.example) return <span className="none">Example venue — not bookable</span>;
   const first = venue.treatments[0];
   const slots = first ? slotsLeftToday() : [];
   if (!slots.length) return <span className="none">No times left today</span>;
@@ -82,7 +92,7 @@ export function SlotCard({
             )}
           </div>
           <div className="vcard-body">
-            <div className="vcard-name">{v.name}</div>
+            <div className="vcard-name">{v.name}{v.example && <ExampleBadge />}</div>
             <div className="vcard-meta">
               {ratingInMeta && <>★ {ratingText(v)} · </>}
               {v.area} · from {fromText(v)}
@@ -115,7 +125,7 @@ export function TopCard({ venue: v }: { venue: Venue }) {
       </div>
       <button onClick={open} style={{ background: 'none', border: 0, padding: 0, textAlign: 'left', color: 'var(--ink)' }}>
         <div className="between" style={{ gap: 10, flexWrap: 'nowrap' }}>
-          <span style={{ fontWeight: 700, fontSize: 17 }}>{v.name}</span>
+          <span style={{ fontWeight: 700, fontSize: 17 }}>{v.name}{v.example && <ExampleBadge />}</span>
           <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>★ {ratingText(v)}</span>
         </div>
         <div className="muted" style={{ fontSize: 14, marginTop: 4 }}>
@@ -143,7 +153,7 @@ export function ResultRow({ venue: v }: { venue: Venue }) {
       <div style={{ flex: '1 1 240px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 4px 4px 0' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
           <button onClick={open} style={{ background: 'none', border: 0, padding: 0, fontWeight: 700, fontSize: 19, color: 'var(--ink)', textAlign: 'left' }}>
-            {v.name}
+            {v.name}{v.example && <ExampleBadge />}
           </button>
           <span style={{ fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>
             ★ {ratingText(v)} <span style={{ color: 'var(--muted)', fontWeight: 500 }}>({v.totalReviews})</span>

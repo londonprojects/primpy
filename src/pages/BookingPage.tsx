@@ -52,6 +52,7 @@ export default function BookingPage() {
 
   if (loading) return <Spinner />;
   if (!venue) return <NotFoundPage />;
+  if (venue.example) return <Navigate to={`/venue/${venue.id}`} replace />;
   if (params.r && !user) {
     return (
       <div className="wrap w880 page">

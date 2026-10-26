@@ -7,6 +7,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { authReady, db } from '../firebase';
+import { EXAMPLE_VENUE_DOCS } from './exampleVenues';
 import type { Treatment, Venue } from '../types';
 import { categories, categoriesForText, categoryById } from '../config/categories';
 
@@ -143,6 +144,13 @@ export function fromPrice(v: Venue): number {
   return prices.length ? Math.min(...prices) : 0;
 }
 
+function exampleVenues(): Venue[] {
+  return EXAMPLE_VENUE_DOCS.map(({ id, doc: d }) => {
+    const v = mapVenue(id, d);
+    return { ...v, photos: [v.image], example: true };
+  });
+}
+
 let venuesCache: Promise<Venue[]> | null = null;
 
 /** All bookable venues (providers) from the shared `users` collection. Cached per session. */
@@ -156,6 +164,8 @@ export function fetchVenues(force = false): Promise<Venue[]> {
           .map((docSnap) => mapVenue(docSnap.id, docSnap.data() as Record<string, unknown>))
           .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)),
       )
+      // Examples step aside as soon as any real venue exists.
+      .then((real) => (real.length ? real : exampleVenues()))
       .catch((e) => {
         venuesCache = null;
         throw e;
@@ -165,6 +175,7 @@ export function fetchVenues(force = false): Promise<Venue[]> {
 }
 
 export async function fetchVenue(id: string): Promise<Venue | null> {
+  if (id.startsWith('example-')) return exampleVenues().find((v) => v.id === id) ?? null;
   await authReady();
   const ref = doc(db, 'users', id);
   const snap = await getDoc(ref);
