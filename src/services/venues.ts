@@ -111,8 +111,9 @@ function mapVenue(id: string, d: Record<string, unknown>): Venue {
   const ratingRaw = num(d.barberAverageRating) ?? num(d.averageRating) ?? 0;
   const rating = Math.min(5, Math.max(0, ratingRaw));
   const totalReviews = Math.round(num(d.barberReviewCount) ?? num(d.totalReviews) ?? 0);
-  const lat = num(d.barberLat);
-  const lng = num(d.barberLng);
+  const loc = (d.location && typeof d.location === 'object' ? d.location : {}) as Record<string, unknown>;
+  const lat = num(d.barberLat) ?? num(d.lat) ?? num(loc.lat);
+  const lng = num(d.barberLng) ?? num(d.lng) ?? num(loc.lng);
 
   const treatmentText = treatments.map((t) => `${t.name} ${t.description ?? ''}`).join(' ');
   const cats = categoriesForText(name, bio, treatmentText);
@@ -164,8 +165,8 @@ export function fetchVenues(force = false): Promise<Venue[]> {
           .map((docSnap) => mapVenue(docSnap.id, docSnap.data() as Record<string, unknown>))
           .sort((a, b) => b.rating - a.rating || a.name.localeCompare(b.name)),
       )
-      // Examples step aside as soon as any real venue exists.
-      .then((real) => (real.length ? real : exampleVenues()))
+      // Examples fill in (after real venues) until there are 5 real ones.
+      .then((real) => (real.length >= 5 ? real : [...real, ...exampleVenues()]))
       .catch((e) => {
         venuesCache = null;
         throw e;

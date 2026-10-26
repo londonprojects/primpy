@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Venue } from '../types';
 import { fromText, ratingText } from './VenueCards';
 import { MapPlaceholder } from './ui';
+import { MAPTILER_KEY, MapView } from './MapView';
 
 /**
  * Price-pin map of search results.
@@ -49,9 +50,18 @@ export default function MapPanel({
 
   return (
     <MapPlaceholder style={style}>
-      <div style={{ position: 'absolute', left: 14, top: 12, fontFamily: 'ui-monospace,monospace', fontSize: 12, color: 'var(--muted)' }}>map tiles</div>
+      {MAPTILER_KEY ? (
+        <MapView
+          pins={venues
+            .filter((v) => v.coordinate)
+            .map((v) => ({ id: v.id, lat: v.coordinate!.latitude, lng: v.coordinate!.longitude, label: fromText(v), title: v.name, example: v.example, selected: v.id === sel?.id }))}
+          onPin={onSelect}
+        />
+      ) : (
+        <div style={{ position: 'absolute', left: 14, top: 12, fontFamily: 'ui-monospace,monospace', fontSize: 12, color: 'var(--muted)' }}>map tiles</div>
+      )}
       {toolbar}
-      {pins.map(({ v, left, top }) => (
+      {!MAPTILER_KEY && pins.map(({ v, left, top }) => (
         <button key={v.id} className={`pin${v.id === sel?.id ? ' on' : ''}`} style={{ left: `${left}%`, top: `${top}%` }} onClick={() => onSelect(v.id)}>
           {fromText(v)}
         </button>

@@ -15,7 +15,7 @@ export const EXAMPLE_VENUE_DOCS: { id: string; doc: Record<string, unknown> }[] 
   {
     id: 'example-1',
     doc: {
-      shopName: 'Juniper & Pearl Nail Studio', barberAddressCity: 'Islington', barberAddressRegion: 'London',
+      shopName: 'Juniper & Pearl Nail Studio', barberAddressCity: 'Islington', barberLat: 51.5362, barberLng: -0.1033, barberAddressRegion: 'London',
       bio: 'Example venue for preview purposes — not a real business.',
       barberAverageRating: 4.8, barberReviewCount: 126, barberLogoDataUrl: svg('Juniper & Pearl', '#c97b84', '#7a3e48'),
       barberServices: [s('Gel manicure', 32, 45, 'nails'), s('Classic pedicure', 38, 50, 'nails'), s('Nail art (per set)', 12, 20, 'nails')],
@@ -24,7 +24,7 @@ export const EXAMPLE_VENUE_DOCS: { id: string; doc: Record<string, unknown> }[] 
   {
     id: 'example-2',
     doc: {
-      shopName: 'Fernway Hair Rooms', barberAddressCity: 'Peckham', barberAddressRegion: 'London',
+      shopName: 'Fernway Hair Rooms', barberAddressCity: 'Peckham', barberLat: 51.474, barberLng: -0.069, barberAddressRegion: 'London',
       bio: 'Example venue for preview purposes — not a real business.',
       barberAverageRating: 4.7, barberReviewCount: 89, barberLogoDataUrl: svg('Fernway', '#4f7c6b', '#22433a'),
       barberServices: [s('Cut & blow dry', 55, 60, 'hair'), s('Full head colour', 95, 120, 'hair'), s('Blow dry', 30, 30, 'hair')],
@@ -33,7 +33,7 @@ export const EXAMPLE_VENUE_DOCS: { id: string; doc: Record<string, unknown> }[] 
   {
     id: 'example-3',
     doc: {
-      shopName: 'Quiet Tide Massage', barberAddressCity: 'Clapham', barberAddressRegion: 'London',
+      shopName: 'Quiet Tide Massage', barberAddressCity: 'Clapham', barberLat: 51.462, barberLng: -0.138, barberAddressRegion: 'London',
       bio: 'Example venue for preview purposes — not a real business.',
       barberAverageRating: 4.9, barberReviewCount: 203, barberLogoDataUrl: svg('Quiet Tide', '#5b7fa6', '#2b3f5c'),
       barberServices: [s('Swedish massage', 60, 60, 'massage'), s('Deep tissue massage', 70, 60, 'massage'), s('Back, neck & shoulders', 40, 30, 'massage')],
@@ -42,7 +42,7 @@ export const EXAMPLE_VENUE_DOCS: { id: string; doc: Record<string, unknown> }[] 
   {
     id: 'example-4',
     doc: {
-      shopName: 'Bramble Brow Bar', barberAddressCity: 'Hackney', barberAddressRegion: 'London',
+      shopName: 'Bramble Brow Bar', barberAddressCity: 'Hackney', barberLat: 51.545, barberLng: -0.0553, barberAddressRegion: 'London',
       bio: 'Example venue for preview purposes — not a real business.',
       barberAverageRating: 4.6, barberReviewCount: 57, barberLogoDataUrl: svg('Bramble', '#a67b5b', '#5c3f2b'),
       barberServices: [s('Brow shape & tint', 25, 30, 'brows'), s('Lash lift', 45, 45, 'Lashes'), s('Brow lamination', 40, 40, 'brows')],
@@ -51,7 +51,7 @@ export const EXAMPLE_VENUE_DOCS: { id: string; doc: Record<string, unknown> }[] 
   {
     id: 'example-5',
     doc: {
-      shopName: 'Copperleaf Barbers', barberAddressCity: 'Camden', barberAddressRegion: 'London',
+      shopName: 'Copperleaf Barbers', barberAddressCity: 'Camden', barberLat: 51.539, barberLng: -0.1426, barberAddressRegion: 'London',
       bio: 'Example venue for preview purposes — not a real business.',
       barberAverageRating: 4.7, barberReviewCount: 148, barberLogoDataUrl: svg('Copperleaf', '#b8733a', '#5e3a1c'),
       barberServices: [s('Skin fade', 28, 40, 'Barbering'), s('Beard trim', 15, 20, 'Barbering'), s('Cut & beard', 38, 50, 'Barbering')],

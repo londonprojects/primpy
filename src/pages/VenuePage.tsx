@@ -8,6 +8,7 @@ import { ExampleBadge, ratingText } from '../components/VenueCards';
 import FloatingBar, { BarSpacer } from '../components/FloatingBar';
 import Gallery from '../components/Gallery';
 import { MapPlaceholder, Spinner } from '../components/ui';
+import { MAPTILER_KEY, MapView } from '../components/MapView';
 import { CLOSING_TIME } from '../config/slots';
 import { bookUrl, isClosed } from '../utils/booking';
 import { fmtDur, money, todayISO } from '../utils/format';
@@ -119,7 +120,17 @@ export default function VenuePage() {
         {tab === 'treat' && <Treatments venue={venue} sel={sel} onToggle={toggle} />}
         {tab === 'reviews' && <Reviews venue={venue} />}
         {tab === 'about' && <About venue={venue} />}
-        {tab === 'map' && <MapPlaceholder label={`map · ${venue.address}`} style={{ height: 340 }} />}
+        {tab === 'map' &&
+          (MAPTILER_KEY && venue.coordinate ? (
+            <MapPlaceholder style={{ height: 340 }}>
+              <MapView
+                pins={[{ id: venue.id, lat: venue.coordinate.latitude, lng: venue.coordinate.longitude, label: venue.name, title: venue.address, example: venue.example, selected: true }]}
+                onPin={() => undefined}
+              />
+            </MapPlaceholder>
+          ) : (
+            <MapPlaceholder label={`map · ${venue.address}`} style={{ height: 340 }} />
+          ))}
         {items.length > 0 && <BarSpacer />}
       </div>
 
