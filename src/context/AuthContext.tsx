@@ -49,7 +49,7 @@ interface AuthContextValue {
   resendVerification: () => Promise<void>;
   /** Re-reads the Firebase user; returns whether the email is now verified. */
   refreshVerified: () => Promise<boolean>;
-  updateProfile: (patch: { displayName?: string; email?: string }) => Promise<{ emailPending: boolean }>;
+  updateProfile: (patch: { displayName?: string; email?: string; avatar?: string }) => Promise<{ emailPending: boolean }>;
   /** `beforeDelete` runs only once we know deletion will be allowed. */
   deleteAccount: (beforeDelete?: () => Promise<void>) => Promise<void>;
 }
@@ -190,13 +190,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return auth.currentUser.emailVerified;
   };
 
-  const updateProfile = async (patch: { displayName?: string; email?: string }) => {
+  const updateProfile = async (patch: { displayName?: string; email?: string; avatar?: string }) => {
     const fbUser = auth.currentUser;
     if (!fbUser || fbUser.isAnonymous) throw new Error('You’re signed out.');
     let emailPending = false;
     if (patch.displayName && patch.displayName !== user?.displayName) {
       await fbUpdateProfile(fbUser, { displayName: patch.displayName });
       await updateDoc(doc(db, 'users', fbUser.uid), { displayName: patch.displayName });
+    }
+    // Avatar is stored as a small data URL on the user doc (like venue logos),
+    // so no Firebase Storage rules are needed. Empty string clears it.
+    if (patch.avatar !== undefined) {
+      await updateDoc(doc(db, 'users', fbUser.uid), { avatar: patch.avatar });
     }
     if (patch.email && patch.email !== fbUser.email) {
       // Firebase only switches the address once the new one is confirmed.

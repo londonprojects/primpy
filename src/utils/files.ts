@@ -2,6 +2,39 @@ import type { Appointment } from '../types';
 import { parseISODate, timeToMin } from './format';
 import { bookingRef } from './booking';
 
+/**
+ * Read an image file and return a small square JPEG data URL (centre-cropped,
+ * `size`px). Kept small so it fits comfortably inside a Firestore `users` doc.
+ */
+export function fileToAvatarDataUrl(file: File, size = 256): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Please choose an image file.'));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Could not process image.'));
+      const scale = Math.max(size / img.width, size / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Could not read that image.'));
+    };
+    img.src = url;
+  });
+}
+
 export function download(filename: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement('a');

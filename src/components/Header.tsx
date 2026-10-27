@@ -52,7 +52,11 @@ export default function Header() {
                 )}
                 {user ? (
                   <button className="avatar-chip" title="Account" onClick={() => navigate('/account')}>
-                    <span>{user.displayName[0]?.toUpperCase()}</span>
+                    {user.avatar ? (
+                      <span className="chip-img"><img src={user.avatar} alt="" /></span>
+                    ) : (
+                      <span>{user.displayName[0]?.toUpperCase()}</span>
+                    )}
                     {firstName(user.displayName)}
                   </button>
                 ) : (

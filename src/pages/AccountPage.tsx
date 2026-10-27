@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fileToAvatarDataUrl } from '../utils/files';
 import { useAuth } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
 import { useInbox } from '../hooks/useInbox';
@@ -25,6 +26,8 @@ export default function AccountPage() {
   const [phone, setPhone] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -64,6 +67,36 @@ export default function AccountPage() {
     navigate('/');
   };
 
+  const pickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAvatarBusy(true);
+    setMsg('');
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      await updateProfile({ avatar: dataUrl });
+      setMsg('Photo updated');
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Could not update photo');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarBusy(true);
+    setMsg('');
+    try {
+      await updateProfile({ avatar: '' });
+      setMsg('Photo removed');
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Could not remove photo');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
   const upcoming = bookings.filter(isUpcoming).length;
   const completed = bookings.filter((b) => displayStatus(b) === 'completed').length;
   const link = (label: string, right: string, to: string, last = false) => (
@@ -80,9 +113,22 @@ export default function AccountPage() {
   return (
     <div className="wrap w880 page">
       <div className="row" style={{ gap: 18, marginBottom: 28 }}>
-        <span className="display" style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--amber)', fontWeight: 800, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {user.displayName[0]?.toUpperCase()}
-        </span>
+        <button
+          type="button"
+          className="avatar-edit"
+          onClick={() => fileRef.current?.click()}
+          disabled={avatarBusy}
+          title="Change photo"
+          aria-label="Change profile photo"
+        >
+          {user.avatar ? (
+            <img src={user.avatar} alt="" />
+          ) : (
+            <span className="display">{user.displayName[0]?.toUpperCase()}</span>
+          )}
+          <span className="avatar-cam" aria-hidden="true">{avatarBusy ? '…' : '📷'}</span>
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickAvatar} />
         <div style={{ flex: '1 1 200px' }}>
           <h1 className="display" style={{ fontWeight: 800, fontSize: 'clamp(30px,5vw,44px)', letterSpacing: '-.03em', margin: 0, lineHeight: 1 }}>
             {user.displayName}
@@ -90,6 +136,11 @@ export default function AccountPage() {
           <div className="muted" style={{ fontSize: 15, marginTop: 6 }}>
             {upcoming} upcoming · {completed} completed · {user.email}
           </div>
+          {user.avatar && (
+            <button type="button" className="btn-text" style={{ fontSize: 13, marginTop: 6 }} disabled={avatarBusy} onClick={removeAvatar}>
+              Remove photo
+            </button>
+          )}
         </div>
       </div>
 

@@ -284,3 +284,30 @@ textarea.input { padding: 14px 16px; border-radius: 16px; font-size: 15px; resiz
 .pill-completed { background: #e6f3f1; color: #0b7b73; }
 .pill-cancelled { background: #fdecec; color: #d64545; }
 .pill-no-show { background: #fff4e5; color: #b45309; }
+
+/* ---------- Editable profile avatar ---------- */
+.avatar-edit {
+  position: relative; width: 72px; height: 72px; border-radius: 50%;
+  border: 0; padding: 0; flex: 0 0 auto; cursor: pointer; overflow: visible;
+  background: var(--amber); color: var(--ink);
+}
+.avatar-edit > .display {
+  width: 100%; height: 100%; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 30px;
+}
+.avatar-edit > img {
+  width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
+}
+.avatar-edit:disabled { opacity: .7; cursor: default; }
+.avatar-cam {
+  position: absolute; right: -2px; bottom: -2px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.avatar-chip .chip-img {
+  width: 26px; height: 26px; padding: 0; overflow: hidden;
+}
+.avatar-chip .chip-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
