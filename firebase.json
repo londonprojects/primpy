@@ -4,7 +4,16 @@
       "source": "functions",
       "codebase": "primpy",
       "runtime": "nodejs22",
-      "ignore": ["node_modules", ".git", "test", "*.local", ".env*"]
+      "ignore": [
+        "node_modules",
+        ".git",
+        "test",
+        "*.local",
+        ".env*"
+      ]
     }
-  ]
+  ],
+  "firestore": {
+    "rules": "firestore.rules"
+  }
 }
