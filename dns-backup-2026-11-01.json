@@ -1,0 +1,7 @@
+{"zone":"primpy.app","zone_id":"3680dffd9cf481588d3fefbaa54f670d","taken":"2026-11-01","records":[
+{"id":"9c01e39b643c4313304a34b1e33acce5","type":"MX","name":"primpy.app","content":"smtp.google.com","priority":1,"ttl":1,"proxied":false},
+{"id":"49173e523b944e25a73bf6772c41af57","type":"TXT","name":"_dmarc.primpy.app","content":"\"v=DMARC1; p=none; rua=mailto:jeremy@spottours.co.uk\"","ttl":1},
+{"id":"44e5a8eda3e14a4aef1aaf48b77f2118","type":"TXT","name":"google._domainkey.primpy.app","content":"(Google Workspace DKIM key, unchanged)","ttl":1},
+{"id":"7137019869f2075331d15f69451b2d74","type":"TXT","name":"primpy.app","content":"\"google-site-verification=eGOQKm92MRdNzatdTSuHj2Rrob-19WP2B0KfV3eKyqg\"","ttl":1},
+{"id":"e5c25007f42076fbb0a0f077713485d4","type":"TXT","name":"primpy.app","content":"\"v=spf1 include:_spf.google.com ~all\"","ttl":1},
+{"id":"e8ac3703f9fa97247f6a9dafa9284b22","type":"AAAA","name":"primpy.app","content":"100::","proxied":true,"ttl":1}]}

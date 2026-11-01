@@ -1,0 +1,120 @@
+rules_version = '2';
+
+// Snip — Firestore rules aligned with the React Native app collections.
+// Deploy to the SAME project as android/app/google-services.json (project_id) and iOS GoogleService-Info.plist.
+// From apps/Snip: npx firebase-tools use <that-project-id> && npx firebase-tools deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userShopId() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && 'chatBarberShopId' in userDoc()
+        && userDoc().chatBarberShopId is string
+        && userDoc().chatBarberShopId != '';
+    }
+
+    // --- User profiles (signup, settings, barber profile, schedule, FCM token) ---
+    match /users/{userId} {
+      // LIST queries on `users` (e.g. where role in ['barber','admin']) require rules Firestore can
+      // reconcile with the query. A role-scoped read here still caused permission-denied for some
+      // clients, so any signed-in user may READ user docs. Writes stay owner-only.
+      // Do not store payment secrets, etc. on this document — use owner-only paths or subcollections.
+      allow read: if signedIn();
+      allow write: if isOwner(userId);
+    }
+
+    // --- Appointments: customer creates; both customer and barber can read/update own rows ---
+    match /appointments/{apptId} {
+      allow read: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.barberId == request.auth.uid
+      );
+      allow create: if signedIn()
+        && request.resource.data.customerId == request.auth.uid;
+      allow update, delete: if signedIn() && (
+        resource.data.customerId == request.auth.uid ||
+        resource.data.barberId == request.auth.uid
+      );
+    }
+
+    // --- Reviews (barber dashboard reads by barberId) ---
+    match /reviews/{reviewId} {
+      allow read: if signedIn() && resource.data.barberId == request.auth.uid;
+      allow create: if signedIn();
+      allow update, delete: if signedIn() && resource.data.barberId == request.auth.uid;
+    }
+
+    // --- Catalog (booking flow lists services / barbers) ---
+    match /services/{docId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
+    match /barbers/{docId} {
+      allow read: if signedIn();
+      allow write: if signedIn();
+    }
+
+    // --- Chat threads ---
+    match /conversations/{convId} {
+      allow read: if signedIn() && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.barberUid == request.auth.uid ||
+        resource.data.barberShopId == request.auth.uid ||
+        (userShopId() && resource.data.barberShopId == userDoc().chatBarberShopId)
+      );
+
+      allow create: if signedIn() && (
+        request.resource.data.customerUid == request.auth.uid ||
+        request.resource.data.barberUid == request.auth.uid
+      );
+
+      allow update: if signedIn() && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.barberUid == request.auth.uid ||
+        (userShopId() && resource.data.barberShopId == userDoc().chatBarberShopId)
+      );
+
+      match /messages/{msgId} {
+        allow read: if signedIn() && (
+          get(/databases/$(database)/documents/conversations/$(convId)).data.customerUid
+            == request.auth.uid ||
+          get(/databases/$(database)/documents/conversations/$(convId)).data.barberUid
+            == request.auth.uid ||
+          (userShopId() &&
+            get(/databases/$(database)/documents/conversations/$(convId)).data.barberShopId
+              == userDoc().chatBarberShopId)
+        );
+        allow create: if signedIn() && (
+          get(/databases/$(database)/documents/conversations/$(convId)).data.customerUid
+            == request.auth.uid ||
+          get(/databases/$(database)/documents/conversations/$(convId)).data.barberUid
+            == request.auth.uid ||
+          (userShopId() &&
+            get(/databases/$(database)/documents/conversations/$(convId)).data.barberShopId
+              == userDoc().chatBarberShopId)
+        );
+        allow update, delete: if false;
+      }
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
