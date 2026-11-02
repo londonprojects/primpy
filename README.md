@@ -57,8 +57,14 @@ A multi-treatment booking is **one** `appointments` doc: `serviceName` joins the
 Rescheduling updates `date` / `time` on the existing doc. Customers can only read their own
 appointments, so the time picker gets busy minute ranges (no names or details) from the
 `primpy_busySlots` callable function (`functions/availability.js`). If that call fails the picker
-says so and the venue confirms. Two people picking the same free slot at the same moment can still
-both book it; preventing that needs booking creation to move server-side.
+says so and the venue confirms.
+
+Primpy bookings are created and moved by the `primpy_createBooking` / `primpy_rescheduleBooking`
+callable functions (`functions/booking.js`), not by the browser. They price the treatments from the
+venue's `barberServices`, check the slot (listed times, Mon–Sat, within 14 days, not past, London
+time) and take a per-venue-day lock (`primpySlotLocks`) inside a transaction, so two people can't
+book the same time. The rules refuse direct Primpy creates; customers may only cancel directly.
+Bookings made in the Snip app don't take the lock.
 
 ## Getting started
 

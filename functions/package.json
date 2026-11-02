@@ -1,13 +1,13 @@
 {
   "name": "primpy-functions",
-  "description": "Cloud Functions for Primpy (codebase \"primpy\" on currentlyremote-snip): booking email alerts and venue availability",
+  "description": "Cloud Functions for Primpy (codebase \"primpy\" on currentlyremote-snip): booking email alerts, availability and booking",
   "type": "module",
   "engines": { "node": "22" },
   "main": "index.js",
   "private": true,
   "scripts": {
     "test": "node --test test/*.test.js",
-    "lint": "node --check index.js && node --check emails.js && node --check send.js && node --check availability.js"
+    "lint": "node --check index.js && node --check emails.js && node --check send.js && node --check availability.js && node --check booking.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

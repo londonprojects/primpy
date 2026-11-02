@@ -29,6 +29,19 @@ export interface NewBooking {
   paymentIntentId?: string;
 }
 
+/** True when a callable isn't deployed yet (our functions never answer 'not-found' themselves). */
+const notDeployed = (e: unknown) => (e as { code?: string })?.code === 'functions/not-found';
+
+const createBookingFn = httpsCallable<
+  { venueId: string; treatmentIds: string[]; date: string; time: string; notes?: string; paymentMethod: PaymentMethod; paymentIntentId?: string },
+  { id: string }
+>(functions, 'primpy_createBooking');
+
+const rescheduleBookingFn = httpsCallable<{ appointmentId: string; date: string; time: string }, { id: string }>(
+  functions,
+  'primpy_rescheduleBooking',
+);
+
 /**
  * Create an appointment in the shared backend. Field names match Snip's
  * `appointments` documents (barberId / barberName / serviceId / serviceName)
@@ -37,8 +50,27 @@ export interface NewBooking {
  * A multi-treatment booking is ONE doc: `serviceName` joins the names with
  * ", ", `price` and `duration` are totals, `serviceId` is the first treatment
  * (what Snip reads) and `serviceIds` lists them all.
+ *
+ * The `primpy_createBooking` function writes it: it prices the treatments
+ * from the venue and refuses a slot that has just been taken. Until that
+ * function is deployed this falls back to writing the doc directly.
  */
 export async function createAppointment(booking: NewBooking): Promise<string> {
+  try {
+    const { data } = await createBookingFn({
+      venueId: booking.venueId,
+      treatmentIds: booking.treatments.map((t) => t.id),
+      date: booking.date,
+      time: booking.time,
+      notes: booking.notes,
+      paymentMethod: booking.paymentMethod,
+      paymentIntentId: booking.paymentIntentId,
+    });
+    return data.id;
+  } catch (e) {
+    if (!notDeployed(e)) throw e;
+  }
+  // TODO: remove once primpy_createBooking is live (the rules then refuse this write).
   const ts = booking.treatments;
   const ref = await addDoc(collection(db, COLLECTION), {
     // `customerId` is required by the shared Firestore rules for create/cancel;
@@ -57,7 +89,6 @@ export async function createAppointment(booking: NewBooking): Promise<string> {
     notes: booking.notes ?? '',
     status: 'scheduled',
     paymentMethod: booking.paymentMethod,
-    // Only the server may record money as paid (firestore.rules enforce 0 here).
     amountPaid: 0,
     paymentIntentId: booking.paymentIntentId ?? null,
     createdAt: new Date().toISOString(),
@@ -123,8 +154,15 @@ export async function setAppointmentStatus(id: string, status: Appointment['stat
   await updateDoc(doc(db, COLLECTION, id), { status });
 }
 
-/** Move a booking to a new slot. Same doc, so Snip sees the change. */
+/** Move a booking to a new slot (server-checked for clashes). Same doc, so Snip sees the change. */
 export async function rescheduleAppointment(id: string, date: string, time: string): Promise<void> {
+  try {
+    await rescheduleBookingFn({ appointmentId: id, date, time });
+    return;
+  } catch (e) {
+    if (!notDeployed(e)) throw e;
+  }
+  // TODO: remove once primpy_rescheduleBooking is live (the rules then refuse this write).
   await updateDoc(doc(db, COLLECTION, id), {
     date,
     time,
