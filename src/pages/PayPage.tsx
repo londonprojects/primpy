@@ -159,7 +159,8 @@ function PayView(props: {
   const dueLater = Math.max(0, total - credit - dueNow);
   const when = whenText(params.d!, params.time);
 
-  const book = async (amountPaid: number, paymentIntentId?: string) => {
+  // The amount paid is recorded server-side from Stripe, never by the browser.
+  const book = async (paymentIntentId?: string) => {
     if (creating.current || !user) return;
     creating.current = true;
     const id = await createAppointment({
@@ -170,8 +171,7 @@ function PayView(props: {
       date: params.d!,
       time: params.time!,
       notes: params.notes,
-      paymentMethod: m,
-      amountPaid,
+      paymentMethod: paymentIntentId ? m : 'venue',
       paymentIntentId,
     });
     reloadBookings();
@@ -187,7 +187,7 @@ function PayView(props: {
     if (sessionStorage.getItem(key)) return;
     if (status === 'succeeded') {
       sessionStorage.setItem(key, '1');
-      book(Number(sp.get('amount') ?? 0), pi).catch((e) => setError(e?.message ?? 'Booking failed'));
+      book(pi).catch((e) => setError(e?.message ?? 'Booking failed'));
     } else if (status) setError('Payment didn’t go through. Try again or pay at the venue.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -197,16 +197,14 @@ function PayView(props: {
     setError('');
     try {
       if (m === 'venue' || dueNow === 0) {
-        await book(0);
+        await book();
         return;
       }
       if (!stripe || !elements || !intent) throw new Error(props.intentError || 'Payment is still loading.');
-      const returnUrl = new URL(window.location.href);
-      returnUrl.searchParams.set('amount', String(dueNow));
-      const res = await stripe.confirmPayment({ elements, redirect: 'if_required', confirmParams: { return_url: returnUrl.toString() } });
+      const res = await stripe.confirmPayment({ elements, redirect: 'if_required', confirmParams: { return_url: window.location.href } });
       if (res.error) throw new Error(res.error.message ?? 'Payment failed');
       if (res.paymentIntent && ['succeeded', 'processing', 'requires_capture'].includes(res.paymentIntent.status)) {
-        await book(dueNow, res.paymentIntent.id);
+        await book(res.paymentIntent.id);
       } else throw new Error('Payment didn’t complete.');
     } catch (e) {
       creating.current = false;

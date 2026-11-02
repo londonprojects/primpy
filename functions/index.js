@@ -1,6 +1,7 @@
 /**
- * Primpy booking email alerts (codebase "primpy", Firebase project currentlyremote-snip).
- * Only reacts to `appointments` docs with source == 'primpy-web'; Snip mobile bookings are ignored.
+ * Primpy Cloud Functions (codebase "primpy", Firebase project currentlyremote-snip):
+ * booking email alerts and venue availability for the time picker.
+ * Email alerts only react to `appointments` docs with source == 'primpy-web'; Snip mobile bookings are ignored.
  *
  * Secret: PRIMPY_RESEND_API_KEY (firebase functions:secrets:set PRIMPY_RESEND_API_KEY --project currentlyremote-snip;
  * value "none" deploys with email switched off). Sender domain must be verified in Resend.
@@ -9,9 +10,11 @@ import { initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
 import { getAuth } from 'firebase-admin/auth'
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore'
+import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { defineSecret } from 'firebase-functions/params'
 import { bookingEmails, changeKind, alertKey } from './emails.js'
 import { sendEmail } from './send.js'
+import { busyRanges, parseBusyRequest } from './availability.js'
 
 initializeApp()
 const db = getFirestore()
@@ -73,3 +76,20 @@ export const primpy_onAppointmentCreated = onDocumentCreated(opts, (event) =>
 
 export const primpy_onAppointmentUpdated = onDocumentUpdated(opts, (event) =>
   handle(event.params.apptId, event.data.after.ref, event.data.before.data(), event.data.after.data()))
+
+/**
+ * Busy time ranges at a venue on a date, for the Primpy time picker. Any signed-in
+ * user (guests included) may ask; only minute ranges are returned, never who booked.
+ */
+export const primpy_busySlots = onCall({ region: 'europe-west2' }, async (req) => {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Sign in to check availability.')
+  let input
+  try { input = parseBusyRequest(req.data) } catch (e) { throw new HttpsError('invalid-argument', e.message) }
+  const venue = await db.doc(`users/${input.venueId}`).get()
+  if (!venue.exists || !['barber', 'admin'].includes(venue.get('role'))) throw new HttpsError('not-found', 'Venue not found.')
+  const snap = await db.collection('appointments')
+    .where('barberId', '==', input.venueId)
+    .where('date', '==', input.date)
+    .get()
+  return { busy: busyRanges(snap.docs.map((d) => ({ id: d.id, data: d.data() })), input.ignoreId) }
+})

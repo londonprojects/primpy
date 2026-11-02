@@ -1,7 +1,8 @@
 import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
 import {readFileSync} from 'fs';
+import {fileURLToPath} from 'url';
 import {doc,setDoc,addDoc,collection,updateDoc} from 'firebase/firestore';
-const env=await initializeTestEnvironment({projectId:'demo-p',firestore:{rules:readFileSync('/workspace/primpy/firestore.rules','utf8'),host:'127.0.0.1',port:8080}});
+const env=await initializeTestEnvironment({projectId:'demo-p',firestore:{rules:readFileSync(fileURLToPath(new URL('../firestore.rules',import.meta.url)),'utf8'),host:'127.0.0.1',port:8080}});
 await env.withSecurityRulesDisabled(async c=>{const db=c.firestore();await setDoc(doc(db,'users/venue'),{role:'barber'});await setDoc(doc(db,'users/cust2'),{role:'customer'});
  await setDoc(doc(db,'appointments/x'),{customerId:'cust',userId:'cust',barberId:'venue',source:'primpy-web',status:'scheduled',date:'2026-11-05',time:'10:00'});
  await setDoc(doc(db,'appointments/snip'),{customerId:'cust',barberId:'venue',status:'scheduled'});});
@@ -9,6 +10,13 @@ const db=env.authenticatedContext('cust').firestore(); const vdb=env.authenticat
 const good={customerId:'cust',userId:'cust',barberId:'venue',barberName:'V',serviceId:'s',serviceIds:['s'],serviceName:'Cut',duration:30,date:'2026-11-05',time:'10:00',price:20,notes:'',status:'scheduled',paymentMethod:'venue',amountPaid:0,paymentIntentId:null,createdAt:new Date().toISOString(),source:'primpy-web'};
 const r=[];const t=async(n,p)=>{try{await p;r.push('ok   '+n)}catch(e){r.push('FAIL '+n+' '+e.message.slice(0,80))}};
 await t('primpy create',assertSucceeds(addDoc(collection(db,'appointments'),good)));
+await t('claims amount paid',assertFails(addDoc(collection(db,'appointments'),{...good,amountPaid:17})));
+await t('deposit without payment intent',assertFails(addDoc(collection(db,'appointments'),{...good,paymentMethod:'deposit'})));
+await t('deposit with bad payment intent',assertFails(addDoc(collection(db,'appointments'),{...good,paymentMethod:'deposit',paymentIntentId:'fake'})));
+await t('deposit with payment intent',assertSucceeds(addDoc(collection(db,'appointments'),{...good,paymentMethod:'deposit',paymentIntentId:'pi_3Abc123'})));
+await t('venue with payment intent',assertFails(addDoc(collection(db,'appointments'),{...good,paymentIntentId:'pi_3Abc123'})));
+await t('mark paid later',assertFails(updateDoc(doc(db,'appointments/x'),{amountPaid:50})));
+await t('switch method later',assertFails(updateDoc(doc(db,'appointments/x'),{paymentMethod:'full'})));
 await t('create for other customer',assertFails(addDoc(collection(db,'appointments'),{...good,customerId:'cust2',userId:'cust2'})));
 await t('extra email field',assertFails(addDoc(collection(db,'appointments'),{...good,venueEmail:'a@b.c'})));
 await t('non-venue barberId',assertFails(addDoc(collection(db,'appointments'),{...good,barberId:'cust2'})));
@@ -22,4 +30,4 @@ await t('clear claim',assertFails(updateDoc(doc(db,'appointments/x'),{primpyNoti
 await t('relabel snip->primpy',assertFails(updateDoc(doc(db,'appointments/snip'),{source:'primpy-web'})));
 await t('snip hair photo',assertSucceeds(updateDoc(doc(vdb,'appointments/snip'),{hairReferencePhotos:[]})));
 await t('stranger update',assertFails(updateDoc(doc(odb,'appointments/x'),{status:'cancelled'})));
-console.log(r.join('\n'));await env.cleanup();
+console.log(r.join('\n'));await env.cleanup();if(r.some(x=>x.startsWith('FAIL')))process.exit(1);

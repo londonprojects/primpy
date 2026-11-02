@@ -64,9 +64,14 @@ service cloud.firestore {
         && strMax(d, 'notes', 1000) && strMax(d, 'createdAt', 40)
         && (!('serviceIds' in d) || (d.serviceIds is list && d.serviceIds.size() <= 20))
         && d.price is number && d.price >= 0 && d.duration is number && d.duration > 0 && d.duration <= 1440
-        && d.amountPaid is number && d.amountPaid >= 0
+        // Money is only ever recorded as paid by the server (from Stripe). A deposit / full
+        // payment must reference the Stripe PaymentIntent it was paid with.
+        && d.amountPaid == 0
         && d.paymentMethod in ['venue', 'deposit', 'full']
-        && (!('paymentIntentId' in d) || d.paymentIntentId == null || (d.paymentIntentId is string && d.paymentIntentId.size() <= 200));
+        && (d.paymentMethod == 'venue'
+          ? (!('paymentIntentId' in d) || d.paymentIntentId == null)
+          : ('paymentIntentId' in d && d.paymentIntentId is string
+              && d.paymentIntentId.matches('^pi_[A-Za-z0-9_]{1,200}$')));
     }
     function primpyUpdateOk() {
       let d = request.resource.data;
