@@ -1,6 +1,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFunctions, type Functions } from 'firebase/functions';
 
 /**
  * Primpy connects to the SAME Firebase backend as the Snip app
@@ -19,6 +20,8 @@ const firebaseConfig = {
 export const app: FirebaseApp = initializeApp(firebaseConfig);
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
+/** Primpy's Cloud Functions run in London (see functions/index.js). */
+export const functions: Functions = getFunctions(app, 'europe-west2');
 
 /**
  * Snip's rules only allow `users` reads when signed in, so signed-out visitors

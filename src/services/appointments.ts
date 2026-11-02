@@ -8,7 +8,8 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import type { Appointment, PaymentMethod } from '../types';
 import { SLOTS } from '../config/slots';
 import { timeToMin } from '../utils/format';
@@ -24,7 +25,7 @@ export interface NewBooking {
   time: string;
   notes?: string;
   paymentMethod: PaymentMethod;
-  amountPaid: number;
+  /** Required for 'deposit' / 'full'; the payments server records the amount once Stripe confirms it. */
   paymentIntentId?: string;
 }
 
@@ -56,7 +57,8 @@ export async function createAppointment(booking: NewBooking): Promise<string> {
     notes: booking.notes ?? '',
     status: 'scheduled',
     paymentMethod: booking.paymentMethod,
-    amountPaid: booking.amountPaid,
+    // Only the server may record money as paid (firestore.rules enforce 0 here).
+    amountPaid: 0,
     paymentIntentId: booking.paymentIntentId ?? null,
     createdAt: new Date().toISOString(),
     source: 'primpy-web',
@@ -130,42 +132,34 @@ export async function rescheduleAppointment(id: string, date: string, time: stri
   });
 }
 
+const busySlots = httpsCallable<
+  { venueId: string; date: string; ignoreId?: string },
+  { busy: { start: number; end: number }[] }
+>(functions, 'primpy_busySlots');
+
 /**
  * Start times that clash with existing bookings at a venue on a date, for a
- * booking of `duration` minutes. Reads other customers' appointments, which
- * the shared rules may not allow; on a permission error every slot is shown
- * as free and Snip stays the source of truth.
+ * booking of `duration` minutes. Customers can't read other people's
+ * appointments, so the busy ranges come from the `primpy_busySlots` function.
+ * Returns null if availability couldn't be checked.
  */
 export async function fetchTakenSlots(
   venueId: string,
   date: string,
   duration: number,
   ignoreId?: string,
-): Promise<Set<string>> {
-  const taken = new Set<string>();
+): Promise<Set<string> | null> {
   try {
-    const q = query(
-      collection(db, COLLECTION),
-      where('barberId', '==', venueId),
-      where('date', '==', date),
-    );
-    const snap = await getDocs(q);
-    const busy = snap.docs
-      .filter((s) => s.id !== ignoreId)
-      .map((s) => s.data() as Record<string, unknown>)
-      .filter((d) => d.status !== 'cancelled' && typeof d.time === 'string')
-      .map((d) => {
-        const start = timeToMin(String(d.time));
-        const len = typeof d.duration === 'number' && d.duration > 0 ? d.duration : 30;
-        return [start, start + len] as const;
-      });
+    const { data } = await busySlots({ venueId, date, ignoreId });
+    const taken = new Set<string>();
     for (const slot of SLOTS) {
       const s = timeToMin(slot);
       const e = s + Math.max(duration, 30);
-      if (busy.some(([bs, be]) => s < be && bs < e)) taken.add(slot);
+      if (data.busy.some((b) => s < b.end && b.start < e)) taken.add(slot);
     }
+    return taken;
   } catch (e) {
-    console.warn('Could not read venue availability; showing all slots', e);
+    console.warn('Could not check venue availability', e);
+    return null;
   }
-  return taken;
 }

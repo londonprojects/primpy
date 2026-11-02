@@ -29,7 +29,8 @@ export default function BookingPage() {
   const resched = params.r ? bookings.find((b) => b.id === params.r) : undefined;
 
   const [notes, setNotes] = useState(params.notes ?? '');
-  const [taken, setTaken] = useState<Set<string>>(new Set());
+  // null = couldn't check availability (the venue confirms instead).
+  const [taken, setTaken] = useState<Set<string> | null>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -63,7 +64,7 @@ export default function BookingPage() {
   if (!items.length) return <Navigate to={`/venue/${venue.id}`} replace />;
 
   const when = whenText(date, time);
-  const unavailable = (slot: string) => taken.has(slot) || isPast(date, slot) || isClosed(date);
+  const unavailable = (slot: string) => !!taken?.has(slot) || isPast(date, slot) || isClosed(date);
 
   const confirm = async () => {
     if (!time) return;
@@ -131,6 +132,9 @@ export default function BookingPage() {
         </div>
 
         {isClosed(date) && <p className="muted" style={{ marginTop: -12, marginBottom: 20 }}>Closed on Sundays — pick another day.</p>}
+        {taken === null && !isClosed(date) && (
+          <p className="muted" style={{ marginTop: -12, marginBottom: 20 }}>We couldn’t check live availability — the venue will confirm your time.</p>
+        )}
 
         {SLOT_GROUPS.map((g) => (
           <div key={g.label} style={{ marginBottom: 24 }}>

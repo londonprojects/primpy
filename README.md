@@ -54,9 +54,11 @@ A multi-treatment booking is **one** `appointments` doc: `serviceName` joins the
 `paymentIntentId`, `rescheduledAt`. Venue docs may set `depositFraction` (0.2) or
 `depositPercent` (20), `phone` and `photos[]`.
 
-Rescheduling updates `date` / `time` on the existing doc. Slot availability reads other
-`appointments` for the venue and date; if the security rules don't allow that, every slot shows as
-free and Snip stays the source of truth.
+Rescheduling updates `date` / `time` on the existing doc. Customers can only read their own
+appointments, so the time picker gets busy minute ranges (no names or details) from the
+`primpy_busySlots` callable function (`functions/availability.js`). If that call fails the picker
+says so and the venue confirms. Two people picking the same free slot at the same moment can still
+both book it; preventing that needs booking creation to move server-side.
 
 ## Getting started
 
@@ -91,6 +93,11 @@ API at `VITE_API_BASE_URL` (see `src/services/payments.ts`):
 
 Both take `Authorization: Bearer <Firebase ID token>`. **These endpoints still need building on the
 Express server.**
+
+The rules only let the browser create a booking with `amountPaid: 0`. A deposit / full booking
+must carry the `paymentIntentId` (`pi_…`) it was paid with, and the payments server's Stripe webhook
+should set `amountPaid` (with the Admin SDK) after checking that PaymentIntent succeeded and belongs
+to that customer and booking. Until then, prepaid bookings show £0 paid online.
 
 ### Not wired to a backend yet
 
