@@ -1,6 +1,7 @@
 /**
  * Primpy Cloud Functions (codebase "primpy", Firebase project currentlyremote-snip):
- * booking email alerts and venue availability for the time picker.
+ * booking email alerts, venue availability for the time picker, and creating /
+ * rescheduling bookings inside a per-venue-day lock so a slot can't be taken twice.
  * Email alerts only react to `appointments` docs with source == 'primpy-web'; Snip mobile bookings are ignored.
  *
  * Secret: PRIMPY_RESEND_API_KEY (firebase functions:secrets:set PRIMPY_RESEND_API_KEY --project currentlyremote-snip;
@@ -15,6 +16,7 @@ import { defineSecret } from 'firebase-functions/params'
 import { bookingEmails, changeKind, alertKey } from './emails.js'
 import { sendEmail } from './send.js'
 import { busyRanges, parseBusyRequest } from './availability.js'
+import { BookingError, checkSlot, clashes, lockId, paymentFields, resolveTreatments } from './booking.js'
 
 initializeApp()
 const db = getFirestore()
@@ -92,4 +94,96 @@ export const primpy_busySlots = onCall({ region: 'europe-west2' }, async (req) =
     .where('date', '==', input.date)
     .get()
   return { busy: busyRanges(snap.docs.map((d) => ({ id: d.id, data: d.data() })), input.ignoreId) }
+})
+
+/* ---------- Bookings: created and moved server-side so two people can't take one slot ---------- */
+
+const LOCKS = 'primpySlotLocks' // no client access (rules catch-all denies it)
+
+function signedInCustomer(req) {
+  if (!req.auth) throw new HttpsError('unauthenticated', 'Log in to book.')
+  if (req.auth.token?.firebase?.sign_in_provider === 'anonymous') throw new HttpsError('unauthenticated', 'Log in to book.')
+  return req.auth.uid
+}
+
+// Never answer 'not-found' from these callables: the web app reads that code as
+// "function not deployed yet" and falls back to the old direct write.
+const asHttps = (e) => (e instanceof BookingError ? new HttpsError(e.code, e.message) : e)
+
+/** Busy ranges for venue+date inside a transaction, after taking the venue-day lock. */
+async function lockAndReadBusy(tx, venueId, date, ignoreId) {
+  const lockRef = db.collection(LOCKS).doc(lockId(venueId, date))
+  await tx.get(lockRef)
+  const snap = await tx.get(db.collection('appointments').where('barberId', '==', venueId).where('date', '==', date))
+  // Writing the lock makes concurrent transactions on the same venue-day conflict and retry.
+  tx.set(lockRef, { touchedAt: FieldValue.serverTimestamp() })
+  return busyRanges(snap.docs.map((d) => ({ id: d.id, data: d.data() })), ignoreId)
+}
+
+const TAKEN = 'Sorry — that time was just booked. Please pick another.'
+
+export const primpy_createBooking = onCall({ region: 'europe-west2' }, async (req) => {
+  const uid = signedInCustomer(req)
+  const d = req.data ?? {}
+  try {
+    checkSlot(d.date, d.time)
+    const pay = paymentFields(d.paymentMethod, d.paymentIntentId)
+    const notes = typeof d.notes === 'string' ? d.notes.slice(0, 1000) : ''
+    const venueId = typeof d.venueId === 'string' && d.venueId && !d.venueId.includes('/') ? d.venueId : null
+    if (!venueId) throw new BookingError('invalid-argument', 'Venue missing.')
+    if (venueId === uid) throw new BookingError('failed-precondition', 'You can’t book your own venue.')
+    const venueSnap = await db.doc(`users/${venueId}`).get()
+    const venue = venueSnap.data()
+    if (!venueSnap.exists || !['barber', 'admin'].includes(venue.role)) throw new BookingError('failed-precondition', 'Venue not found.')
+    const items = resolveTreatments(venue, d.treatmentIds)
+    const ref = db.collection('appointments').doc()
+    await db.runTransaction(async (tx) => {
+      const busy = await lockAndReadBusy(tx, venueId, d.date)
+      if (clashes(busy, d.time, items.duration)) throw new BookingError('already-exists', TAKEN)
+      tx.create(ref, {
+        customerId: uid,
+        userId: uid,
+        barberId: venueId,
+        barberName: String(venue.shopName || venue.displayName || 'Venue').slice(0, 200),
+        ...items,
+        date: d.date,
+        time: d.time,
+        notes,
+        status: 'scheduled',
+        ...pay,
+        createdAt: new Date().toISOString(),
+        source: 'primpy-web',
+      })
+    })
+    return { id: ref.id }
+  } catch (e) {
+    throw asHttps(e)
+  }
+})
+
+export const primpy_rescheduleBooking = onCall({ region: 'europe-west2' }, async (req) => {
+  const uid = signedInCustomer(req)
+  const d = req.data ?? {}
+  try {
+    checkSlot(d.date, d.time)
+    if (typeof d.appointmentId !== 'string' || !d.appointmentId || d.appointmentId.includes('/')) throw new BookingError('invalid-argument', 'Booking missing.')
+    const ref = db.doc(`appointments/${d.appointmentId}`)
+    const first = await ref.get()
+    const appt = first.data()
+    if (!first.exists || appt.customerId !== uid) throw new BookingError('permission-denied', 'Booking not found.')
+    if (appt.source !== 'primpy-web') throw new BookingError('failed-precondition', 'Change this booking in Snip.')
+    if (appt.status !== 'scheduled' && appt.status !== 'confirmed') throw new BookingError('failed-precondition', 'This booking can’t be moved.')
+    const duration = typeof appt.duration === 'number' && appt.duration > 0 ? appt.duration : 30
+    await db.runTransaction(async (tx) => {
+      // Firestore transactions must finish every read before the first write (the lock).
+      const now = (await tx.get(ref)).data()
+      const busy = await lockAndReadBusy(tx, appt.barberId, d.date, ref.id)
+      if (now.status !== appt.status) throw new BookingError('failed-precondition', 'This booking just changed. Refresh and try again.')
+      if (clashes(busy, d.time, duration)) throw new BookingError('already-exists', TAKEN)
+      tx.update(ref, { date: d.date, time: d.time, rescheduledAt: new Date().toISOString() })
+    })
+    return { id: ref.id }
+  } catch (e) {
+    throw asHttps(e)
+  }
 })
