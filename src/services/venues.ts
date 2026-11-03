@@ -1,11 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-} from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { authReady, db } from '../firebase';
 import { EXAMPLE_VENUE_DOCS } from './exampleVenues';
 import type { Treatment, Venue } from '../types';
@@ -81,13 +74,15 @@ function formatAddress(d: Record<string, unknown>): { address: string; city: str
 }
 
 function venueImage(d: Record<string, unknown>): string {
-  const logo = str(d.barberLogoDataUrl) || str(d.logoUrl);
+  // barberLogoUrl: Cloud Storage (current Snip); barberLogoDataUrl: older base64 profiles.
+  const logo = str(d.barberLogoUrl) || str(d.barberLogoDataUrl) || str(d.logoUrl);
   return logo || DEFAULT_IMAGE;
 }
 
 /** Hero first, then any `photos` on the doc, then category imagery as filler. */
 function venuePhotos(d: Record<string, unknown>, image: string, cats: string[]): string[] {
-  const own = Array.isArray(d.photos) ? d.photos.filter((p): p is string => typeof p === 'string') : [];
+  const list = Array.isArray(d.photos) ? d.photos : Array.isArray(d.barberPortfolioUrls) ? d.barberPortfolioUrls : [];
+  const own = list.filter((p): p is string => typeof p === 'string');
   const filler = (cats.length ? cats : categories.map((c) => c.id))
     .map((c) => categoryById(c)?.image)
     .filter((x): x is string => !!x);
@@ -135,6 +130,7 @@ function mapVenue(id: string, d: Record<string, unknown>): Venue {
     bio: bio || undefined,
     phone: str(d.phone) || str(d.barberPhone) || undefined,
     deposit: depositFraction(d),
+    payAtVenue: d.allowPayAtVenue === true,
     coordinate: lat != null && lng != null ? { latitude: lat, longitude: lng } : undefined,
   };
 }
@@ -154,12 +150,14 @@ function exampleVenues(): Venue[] {
 
 let venuesCache: Promise<Venue[]> | null = null;
 
-/** All bookable venues (providers) from the shared `users` collection. Cached per session. */
+/**
+ * All bookable venues from the shared public `barberProfiles` collection (the same listing the
+ * Snip app shows). `users` docs are private to their owner. Cached per session.
+ */
 export function fetchVenues(force = false): Promise<Venue[]> {
   if (!venuesCache || force) {
-    const q = query(collection(db, 'users'), where('role', 'in', ['barber', 'admin']));
     venuesCache = authReady()
-      .then(() => getDocs(q))
+      .then(() => getDocs(collection(db, 'barberProfiles')))
       .then((snap) =>
         snap.docs
           .map((docSnap) => mapVenue(docSnap.id, docSnap.data() as Record<string, unknown>))
@@ -178,10 +176,7 @@ export function fetchVenues(force = false): Promise<Venue[]> {
 export async function fetchVenue(id: string): Promise<Venue | null> {
   if (id.startsWith('example-')) return exampleVenues().find((v) => v.id === id) ?? null;
   await authReady();
-  const ref = doc(db, 'users', id);
-  const snap = await getDoc(ref);
+  const snap = await getDoc(doc(db, 'barberProfiles', id));
   if (!snap.exists()) return null;
-  const data = snap.data() as Record<string, unknown>;
-  if (data.role !== 'barber' && data.role !== 'admin') return null;
-  return mapVenue(snap.id, data);
+  return mapVenue(snap.id, snap.data() as Record<string, unknown>);
 }

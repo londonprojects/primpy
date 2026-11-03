@@ -24,7 +24,7 @@ import {
   verifyPasswordResetCode,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import type { AppUser, UserRole } from '../types';
 
@@ -98,9 +98,18 @@ async function ensureProfile(
   };
   if (role === 'barber' && shopName) {
     data.shopName = shopName;
-    data.barberServices = [];
   }
   await setDoc(ref, data);
+  if (role === 'barber') {
+    // The public listing (shared with the Snip app). Written after users/{uid}: the rules
+    // check that the caller's role is barber before allowing it.
+    await setDoc(doc(db, 'barberProfiles', fbUser.uid), {
+      shopName: shopName ?? displayName,
+      displayName,
+      barberServices: [],
+      createdAt: serverTimestamp(),
+    });
+  }
   return true;
 }
 

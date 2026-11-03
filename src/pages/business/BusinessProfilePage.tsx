@@ -4,7 +4,16 @@ import BusinessNav from '../../components/BusinessNav';
 import { Spinner } from '../../components/ui';
 import { fetchVenueProfile, saveVenueProfile, type VenueProfileForm } from '../../services/business';
 
-const EMPTY: VenueProfileForm = { shopName: '', bio: '', phone: '', addressLine1: '', city: '', region: '' };
+const EMPTY: VenueProfileForm = {
+  shopName: '',
+  bio: '',
+  phone: '',
+  addressLine1: '',
+  city: '',
+  region: '',
+  allowPayAtVenue: false,
+  depositPercent: 0,
+};
 
 export default function BusinessProfilePage() {
   const { user } = useAuth();
@@ -74,6 +83,35 @@ export default function BusinessProfilePage() {
               <input className="input h50" value={form.region} placeholder="Greater London" onChange={set('region')} />
             </label>
           </div>
+
+          <h3 className="label" style={{ marginTop: 22, marginBottom: 10 }}>Payments</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,240px),1fr))', gap: 14 }}>
+            <label className="field">
+              Deposit at booking (%)
+              <input
+                className="input h50"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={100}
+                value={form.depositPercent || ''}
+                placeholder="0 = no deposit option"
+                onChange={(e) => setForm((f) => ({ ...f, depositPercent: Number(e.target.value) || 0 }))}
+              />
+            </label>
+            <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'end', minHeight: 50 }}>
+              <input
+                type="checkbox"
+                checked={form.allowPayAtVenue}
+                onChange={(e) => setForm((f) => ({ ...f, allowPayAtVenue: e.target.checked }))}
+              />
+              Let customers pay at the venue
+            </label>
+          </div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+            Customers can always pay in full when they book. A customer who cancels within 24 hours
+            doesn’t get the deposit back.
+          </p>
           <div className="row" style={{ marginTop: 18 }}>
             <button className="btn btn-teal btn-sm h48 btn-bold" style={{ fontSize: 15, padding: '0 22px' }} disabled={busy} onClick={save}>
               {busy ? 'Saving…' : 'Save profile'}

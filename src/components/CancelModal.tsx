@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import type { Appointment, Venue } from '../types';
 import { fetchVenues } from '../services/venues';
 import { cancelAppointment } from '../services/appointments';
-import { requestRefund } from '../services/payments';
 import { useUserData } from '../context/UserDataContext';
 import { appointmentTreatmentIds, bookUrl } from '../utils/booking';
 import { dayParts, money, msUntil } from '../utils/format';
@@ -24,21 +23,24 @@ export default function CancelModal({ appointment: a, onClose }: { appointment: 
       .catch(() => undefined);
   }, [a.barberId]);
 
+  // Mirrors the server's policy (it decides the actual refund): within 24 hours the venue keeps
+  // the deposit, or a deposit-sized part of a full payment; otherwise everything is refunded.
   const late = msUntil(a.date, a.time) < DAY_MS;
   const paid = a.amountPaid;
-  const keeps = late && paid > 0;
+  const kept = late ? Math.min(paid, Math.round(a.price * (venue?.deposit ?? 0) * 100) / 100) : 0;
+  const refund = Math.max(0, paid - kept);
+  const keeps = kept > 0;
   const p = dayParts(a.date);
   const msg = keeps
-    ? `This is less than 24 hours away, so the ${money(paid)} deposit won’t be refunded.`
-    : late
-      ? 'Nothing has been paid online, so cancelling is free.'
-      : `It’s more than 24 hours away, so cancelling is free${paid > 0 ? ` and your ${money(paid)} is refunded` : ''}.`;
+    ? `This is less than 24 hours away, so ${money(kept)} won’t be refunded${refund > 0 ? ` and ${money(refund)} is refunded` : ''}.`
+    : paid > 0
+      ? `Cancelling is free and your ${money(paid)} is refunded.`
+      : 'Nothing has been paid online, so cancelling is free.';
 
   const confirm = async () => {
     setBusy(true);
     setError('');
     try {
-      if (paid > 0 && !late) await requestRefund(a.id);
       await cancelAppointment(a.id);
       patchBooking(a.id, { status: 'cancelled' });
       onClose();

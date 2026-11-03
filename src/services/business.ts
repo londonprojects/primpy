@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { authReady, db } from '../firebase';
 
 export interface VenueProfileForm {
@@ -8,7 +8,18 @@ export interface VenueProfileForm {
   addressLine1: string;
   city: string;
   region: string;
+  /** Customers may book now and pay when they arrive. */
+  allowPayAtVenue: boolean;
+  /** Deposit taken at booking, as a percentage of the total (0 = no deposit option). */
+  depositPercent: number;
 }
+
+/**
+ * A venue's public listing lives in `barberProfiles/{uid}`, shared with the Snip app.
+ * `users/{uid}` is private to the owner; older Primpy venues kept their listing there, so it
+ * is only read as a fallback until the venue saves again.
+ */
+const PROFILES = 'barberProfiles';
 
 /** Editable treatment used in the business UI (numbers, not formatted strings). */
 export interface TreatmentDraft {
@@ -35,8 +46,13 @@ export async function fetchVenueProfile(
   uid: string,
 ): Promise<{ profile: VenueProfileForm; treatments: TreatmentDraft[] }> {
   await authReady();
-  const snap = await getDoc(doc(db, 'users', uid));
-  const d = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+  const [profileSnap, userSnap] = await Promise.all([
+    getDoc(doc(db, PROFILES, uid)),
+    getDoc(doc(db, 'users', uid)),
+  ]);
+  const legacy = (userSnap.exists() ? userSnap.data() : {}) as Record<string, unknown>;
+  const d = { ...legacy, ...((profileSnap.exists() ? profileSnap.data() : {}) as Record<string, unknown>) };
+  const fraction = typeof d.depositFraction === 'number' ? d.depositFraction : 0;
   const rawServices = Array.isArray(d.barberServices) ? d.barberServices : [];
   const treatments: TreatmentDraft[] = rawServices.map((r, i) => {
     const o = (r ?? {}) as Record<string, unknown>;
@@ -57,14 +73,17 @@ export async function fetchVenueProfile(
       addressLine1: str(d.barberAddressLine1),
       city: str(d.barberAddressCity),
       region: str(d.barberAddressRegion),
+      allowPayAtVenue: d.allowPayAtVenue === true,
+      depositPercent: fraction > 0 && fraction <= 1 ? Math.round(fraction * 100) : 0,
     },
     treatments,
   };
 }
 
 export async function saveVenueProfile(uid: string, form: VenueProfileForm): Promise<void> {
+  const pct = Math.min(100, Math.max(0, Math.round(form.depositPercent)));
   await setDoc(
-    doc(db, 'users', uid),
+    doc(db, PROFILES, uid),
     {
       shopName: form.shopName.trim(),
       bio: form.bio.trim(),
@@ -72,6 +91,10 @@ export async function saveVenueProfile(uid: string, form: VenueProfileForm): Pro
       barberAddressLine1: form.addressLine1.trim(),
       barberAddressCity: form.city.trim(),
       barberAddressRegion: form.region.trim(),
+      allowPayAtVenue: form.allowPayAtVenue,
+      // The Snip API reads depositFraction; deleteField() turns the deposit option off.
+      depositFraction: pct > 0 ? pct / 100 : deleteField(),
+      updatedAt: serverTimestamp(),
     },
     { merge: true },
   );
@@ -93,7 +116,7 @@ export async function saveTreatments(uid: string, treatments: TreatmentDraft[]):
       category: t.category || '',
       description: t.description.trim(),
     }));
-  await setDoc(doc(db, 'users', uid), { barberServices }, { merge: true });
+  await setDoc(doc(db, PROFILES, uid), { barberServices, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 export function emptyTreatment(): TreatmentDraft {

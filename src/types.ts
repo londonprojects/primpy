@@ -51,6 +51,8 @@ export interface Venue {
   phone?: string;
   /** Fraction of the total taken as a deposit (0.2 = 20%). Absent = no deposit. */
   deposit?: number;
+  /** The venue lets customers book now and pay when they arrive. */
+  payAtVenue?: boolean;
   coordinate?: { latitude: number; longitude: number };
   /** Built-in fictional example (shown only when there are no real venues); not bookable. */
   example?: boolean;
@@ -79,6 +81,8 @@ export interface Appointment {
   paymentMethod: PaymentMethod;
   /** Amount already paid online. */
   amountPaid: number;
+  /** An unpaid hold made through the API: the slot is held briefly while the customer pays. */
+  awaitingPayment?: boolean;
   notes?: string;
   createdAt?: string;
 }

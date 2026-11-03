@@ -5,9 +5,14 @@ import type { Stripe, StripeElements } from '@stripe/stripe-js';
 import { useVenue } from '../hooks/useVenues';
 import { useAuth } from '../context/AuthContext';
 import { useUserData } from '../context/UserDataContext';
-import { createAppointment } from '../services/appointments';
-import { createBookingIntent, getStripe, paymentsEnabled, type BookingIntent } from '../services/payments';
-import { validatePromo } from '../services/stubs';
+import { getStripe, paymentsEnabled } from '../services/payments';
+import {
+  confirmPayment,
+  createBooking,
+  createPaymentIntent,
+  type BookingResult,
+  type PaymentIntentResult,
+} from '../services/snipApi';
 import FloatingBar, { BarSpacer } from '../components/FloatingBar';
 import { LoginGate, Spinner } from '../components/ui';
 import type { PaymentMethod, Venue } from '../types';
@@ -28,40 +33,33 @@ const appearance = {
 };
 const FONTS = [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&display=swap' }];
 
-/** Step 3 of booking: pay at venue, pay a deposit, or pay in full (Stripe). */
+/** Which ways to pay this venue offers. The server enforces the same rules. */
+function offered(venue: Venue): Record<PaymentMethod, boolean> {
+  return {
+    venue: venue.payAtVenue === true,
+    deposit: paymentsEnabled && !!venue.deposit,
+    full: paymentsEnabled,
+  };
+}
+
+/**
+ * Step 3 of booking: pay at the venue, pay a deposit, or pay in full.
+ *
+ * The booking is made through the Snip API: the server prices the treatments, holds the time
+ * and works out what's due now. Paying online then charges exactly that amount (Stripe), and
+ * the server confirms the booking once the payment succeeds.
+ */
 export default function PayPage() {
   const { id } = useParams<{ id: string }>();
-  const [sp] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { venue, loading } = useVenue(id);
+  const [sp] = useSearchParams();
   const params = readBookingParams(sp);
 
-  const [method, setMethod] = useState<PaymentMethod | null>(null);
-  const [promo, setPromo] = useState('');
-  const [credit, setCredit] = useState(0);
-  const [promoMsg, setPromoMsg] = useState('');
-  const [intent, setIntent] = useState<BookingIntent | null>(null);
-  const [intentError, setIntentError] = useState('');
+  const [booking, setBooking] = useState<BookingResult | null>(null);
+  const [intent, setIntent] = useState<PaymentIntentResult | null>(null);
 
   const items = useMemo(() => venue?.treatments.filter((t) => params.t.includes(t.id)) ?? [], [venue, params.t]);
-  const deposit = venue?.deposit && paymentsEnabled ? venue.deposit : 0;
-  const m: PaymentMethod = method ?? (deposit ? 'deposit' : 'venue');
-
-  // Ask the server for a PaymentIntent whenever the amount could change.
-  const promoCode = credit ? promo.trim().toUpperCase() : '';
-  useEffect(() => {
-    setIntent(null);
-    setIntentError('');
-    if (!venue || !user || m === 'venue' || !paymentsEnabled || !params.time || !params.d) return;
-    let live = true;
-    createBookingIntent({ venueId: venue.id, treatmentIds: params.t, date: params.d, time: params.time, method: m, promoCode: promoCode || undefined })
-      .then((i) => live && setIntent(i))
-      .catch((e) => live && setIntentError(e instanceof Error ? e.message : 'Could not start payment'));
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [venue?.id, user?.id, m, promoCode, params.d, params.time, params.t.join(',')]);
 
   if (loading || authLoading) return <Spinner />;
   if (!venue) return <NotFoundPage />;
@@ -73,35 +71,14 @@ export default function PayPage() {
       </div>
     );
 
-  const applyPromo = async () => {
-    setPromoMsg('');
-    try {
-      const r = await validatePromo(promo);
-      setCredit(r.credit);
-      setPromoMsg(r.label);
-    } catch (e) {
-      setCredit(0);
-      setPromoMsg(e instanceof Error ? e.message : 'That code didn’t work');
-    }
-  };
-
   const view = (stripe: Stripe | null, elements: StripeElements | null) => (
     <PayView
       venue={venue}
       items={items}
-      method={m}
-      deposit={deposit}
-      setMethod={setMethod}
-      promo={promo}
-      setPromo={(v) => {
-        setPromo(v);
-        setPromoMsg('');
-      }}
-      applyPromo={applyPromo}
-      promoMsg={promoMsg}
-      credit={credit}
+      booking={booking}
+      setBooking={setBooking}
       intent={intent}
-      intentError={intentError}
+      setIntent={setIntent}
       stripe={stripe}
       elements={elements}
     />
@@ -127,110 +104,141 @@ function WithStripe({ children }: { children: (s: Stripe | null, e: StripeElemen
 function PayView(props: {
   venue: Venue;
   items: Venue['treatments'];
-  method: PaymentMethod;
-  deposit: number;
-  setMethod: (m: PaymentMethod) => void;
-  promo: string;
-  setPromo: (v: string) => void;
-  applyPromo: () => void;
-  promoMsg: string;
-  credit: number;
-  intent: BookingIntent | null;
-  intentError: string;
+  booking: BookingResult | null;
+  setBooking: (b: BookingResult | null) => void;
+  intent: PaymentIntentResult | null;
+  setIntent: (i: PaymentIntentResult | null) => void;
   stripe: Stripe | null;
   elements: StripeElements | null;
 }) {
-  const { venue, items, method: m, deposit, intent, stripe, elements } = props;
+  const { venue, items, booking, intent, stripe, elements } = props;
   const navigate = useNavigate();
   const [sp] = useSearchParams();
   const params = readBookingParams(sp);
-  const { user } = useAuth();
   const { reloadBookings } = useUserData();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const creating = useRef(false);
+  const confirming = useRef(false);
+
+  const can = offered(venue);
+  const firstOffered = (['deposit', 'venue', 'full'] as PaymentMethod[]).find((k) => can[k]) ?? null;
+  const [method, setMethod] = useState<PaymentMethod | null>(firstOffered);
+  const m = booking?.paymentMethod ?? method;
 
   const total = items.reduce((a, t) => a + t.price, 0);
-  const credit = Math.min(props.credit, total);
-  const dep = deposit ? Math.round(total * deposit) : 0;
-  const estNow = m === 'full' ? total - credit : m === 'deposit' ? Math.max(0, dep - credit) : 0;
-  // The server's amount wins once there is a PaymentIntent.
-  const dueNow = intent ? intent.amount / 100 : estNow;
-  const dueLater = Math.max(0, total - credit - dueNow);
+  const dep = venue.deposit ? Math.round(total * venue.deposit) : 0;
+  const estNow = m === 'full' ? total : m === 'deposit' ? dep : 0;
+  // Once the server has priced the booking, its amount wins.
+  const dueNow = booking ? booking.amountDueCents / 100 : estNow;
+  const priced = booking ? booking.priceCents / 100 : total;
+  const dueLater = Math.max(0, priced - dueNow);
   const when = whenText(params.d!, params.time);
 
-  const book = async (amountPaid: number, paymentIntentId?: string) => {
-    if (creating.current || !user) return;
-    creating.current = true;
-    const id = await createAppointment({
-      userId: user.id,
-      venueId: venue.id,
-      venueName: venue.name,
-      treatments: items.map((t) => ({ id: t.id, name: t.name, price: t.price, duration: t.duration })),
-      date: params.d!,
-      time: params.time!,
-      notes: params.notes,
-      paymentMethod: m,
-      amountPaid,
-      paymentIntentId,
-    });
+  const done = (appointmentId: string) => {
     reloadBookings();
-    navigate(`/booked/${id}`, { replace: true });
+    navigate(`/booked/${appointmentId}`, { replace: true });
   };
 
   // Back from a redirect-based payment method (3-D Secure, wallets).
   useEffect(() => {
-    const pi = sp.get('payment_intent');
+    const appt = sp.get('appt');
     const status = sp.get('redirect_status');
-    if (!pi || !user) return;
-    const key = `primpy:booked:${pi}`;
+    if (!appt || !status) return;
+    const key = `primpy:confirmed:${appt}`;
     if (sessionStorage.getItem(key)) return;
     if (status === 'succeeded') {
       sessionStorage.setItem(key, '1');
-      book(Number(sp.get('amount') ?? 0), pi).catch((e) => setError(e?.message ?? 'Booking failed'));
-    } else if (status) setError('Payment didn’t go through. Try again or pay at the venue.');
+      confirmPayment(appt)
+        .then(() => done(appt))
+        .catch(() => done(appt)); // the Stripe webhook confirms it too; show the booking either way
+    } else setError('Payment didn’t go through. Please try again.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, []);
 
-  const confirm = async () => {
+  /** Step 1: reserve the time on the server (and, if paying now, get the card form ready). */
+  const reserve = async () => {
+    if (!m) return;
+    const created = await createBooking({
+      venueId: venue.id,
+      treatmentIds: items.map((t) => t.id),
+      date: params.d!,
+      time: params.time!,
+      paymentMethod: m,
+      notes: params.notes,
+    });
+    props.setBooking(created);
+    if (created.amountDueCents === 0) {
+      done(created.appointmentId);
+      return;
+    }
+    props.setIntent(await createPaymentIntent(created.appointmentId));
+  };
+
+  /** Step 2: pay the amount the server set, then let the server confirm the booking. */
+  const pay = async () => {
+    if (!booking || !stripe || !elements) throw new Error('The card form is still loading.');
+    const returnUrl = new URL(window.location.href);
+    returnUrl.searchParams.set('appt', booking.appointmentId);
+    const res = await stripe.confirmPayment({
+      elements,
+      redirect: 'if_required',
+      confirmParams: { return_url: returnUrl.toString() },
+    });
+    if (res.error) throw new Error(res.error.message ?? 'Payment failed');
+    if (!res.paymentIntent || !['succeeded', 'processing'].includes(res.paymentIntent.status)) {
+      throw new Error('Payment didn’t complete.');
+    }
+    try {
+      await confirmPayment(booking.appointmentId);
+    } catch {
+      // The Stripe webhook also confirms the booking; don't make the customer pay twice.
+    }
+    done(booking.appointmentId);
+  };
+
+  const onCta = async () => {
+    if (confirming.current) return;
+    confirming.current = true;
     setBusy(true);
     setError('');
     try {
-      if (m === 'venue' || dueNow === 0) {
-        await book(0);
-        return;
-      }
-      if (!stripe || !elements || !intent) throw new Error(props.intentError || 'Payment is still loading.');
-      const returnUrl = new URL(window.location.href);
-      returnUrl.searchParams.set('amount', String(dueNow));
-      const res = await stripe.confirmPayment({ elements, redirect: 'if_required', confirmParams: { return_url: returnUrl.toString() } });
-      if (res.error) throw new Error(res.error.message ?? 'Payment failed');
-      if (res.paymentIntent && ['succeeded', 'processing', 'requires_capture'].includes(res.paymentIntent.status)) {
-        await book(dueNow, res.paymentIntent.id);
-      } else throw new Error('Payment didn’t complete.');
+      if (!booking || !intent) await reserve();
+      else await pay();
     } catch (e) {
-      creating.current = false;
       setError(e instanceof Error ? e.message : 'Something went wrong');
+    } finally {
+      confirming.current = false;
       setBusy(false);
     }
   };
 
   const off = 'Card payments aren’t set up yet';
-  const opts: [PaymentMethod, string, string, boolean][] = [
-    ['venue', 'Pay at the venue', dep ? 'Not available — this venue asks for a deposit' : 'Nothing to pay today', !dep],
-    ['deposit', 'Pay a deposit now', !paymentsEnabled ? off : dep ? `${money(dep)} now, the rest at the venue` : 'Not required by this venue', !!dep],
-    ['full', 'Pay in full now', paymentsEnabled ? 'Settle up now and skip the till' : off, paymentsEnabled],
+  const opts: [PaymentMethod, string, string][] = [
+    ['venue', 'Pay at the venue', can.venue ? 'Nothing to pay today' : 'This venue asks you to pay when you book'],
+    ['deposit', 'Pay a deposit now', !paymentsEnabled ? off : dep ? `${money(dep)} now, the rest at the venue` : 'Not offered by this venue'],
+    ['full', 'Pay in full now', paymentsEnabled ? 'Settle up now and skip the till' : off],
   ];
+  const locked = !!booking; // the time is held for this payment choice
+
+  const cta = busy
+    ? m === 'venue'
+      ? 'Booking…'
+      : 'Please wait…'
+    : !booking && dueNow > 0
+      ? 'Continue to payment'
+      : dueNow > 0
+        ? `Pay ${money(dueNow)}`
+        : 'Confirm booking';
 
   return (
     <>
       <div className="wrap w780" style={{ paddingTop: 24, paddingBottom: 48 }}>
         <div className="stepper">
-          <button className="done" onClick={() => navigate(`/venue/${venue.id}?t=${params.t.join(',')}`)}>
+          <button className="done" disabled={locked} onClick={() => navigate(`/venue/${venue.id}?t=${params.t.join(',')}`)}>
             ✓ {items.length} treatment{items.length === 1 ? '' : 's'}
           </button>
           <span className="sep" />
-          <button className="done" onClick={() => navigate(bookUrl(venue.id, { ...params, time: params.time }))}>
+          <button className="done" disabled={locked} onClick={() => navigate(bookUrl(venue.id, { ...params, time: params.time }))}>
             ✓ {when}
           </button>
           <span className="sep" />
@@ -238,56 +246,41 @@ function PayView(props: {
         </div>
         <h1 className="h-flow" style={{ marginBottom: 24 }}>How would you like to pay?</h1>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {opts.map(([id, label, desc, ok]) => (
-            <button key={id} className={`radio-card${m === id ? ' on' : ''}`} disabled={!ok} onClick={() => ok && props.setMethod(id)} role="radio" aria-checked={m === id}>
-              <span className="dot" />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>{label}</div>
-                <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{desc}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {m !== 'venue' && (
-          <div className="card card-pad" style={{ marginTop: 20 }}>
-            <div className="label" style={{ marginBottom: 12 }}>Card</div>
-            {props.intentError ? (
-              <div className="err" style={{ marginTop: 0 }}>{props.intentError}</div>
-            ) : intent ? (
-              <PaymentElement options={{ layout: 'tabs' }} />
-            ) : (
-              <div className="muted" style={{ fontSize: 14 }}>Loading secure card form…</div>
-            )}
+        {!firstOffered ? (
+          <div className="banner-amber" style={{ padding: '12px 14px' }}>
+            This venue isn’t taking online bookings right now. Please contact them directly.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {opts.map(([id, label, desc]) => {
+              const ok = can[id] && !locked;
+              return (
+                <button key={id} className={`radio-card${m === id ? ' on' : ''}`} disabled={!ok} onClick={() => ok && setMethod(id)} role="radio" aria-checked={m === id}>
+                  <span className="dot" />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>{label}</div>
+                    <div className="muted" style={{ fontSize: 14, marginTop: 2 }}>{desc}</div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        <div className="card card-pad" style={{ marginTop: 20 }}>
-          <div className="label" style={{ marginBottom: 12 }}>Gift card or promo code</div>
-          <div className="row" style={{ gap: 8 }}>
-            <input
-              className="input h50"
-              value={props.promo}
-              onChange={(e) => props.setPromo(e.target.value)}
-              placeholder="e.g. GLOW-1234"
-              style={{ flex: '1 1 200px', width: 'auto', textTransform: 'uppercase' }}
-            />
-            <button className="btn btn-ink btn-sm h50 btn-bold" style={{ padding: '0 20px', fontSize: 15 }} onClick={props.applyPromo}>
-              Apply
-            </button>
+        {intent && (
+          <div className="card card-pad" style={{ marginTop: 20 }}>
+            <div className="label" style={{ marginBottom: 12 }}>Card</div>
+            <PaymentElement options={{ layout: 'tabs' }} />
+            {booking?.holdExpiresAtMs ? (
+              <div className="muted" style={{ fontSize: 13, marginTop: 10 }}>
+                We’re holding this time for you for a few minutes while you pay.
+              </div>
+            ) : null}
           </div>
-          <div className="ok-msg" style={{ marginTop: 8, color: credit ? 'var(--teal-dark)' : 'var(--danger)' }}>{props.promoMsg}</div>
-        </div>
+        )}
 
         <div className="card card-pad" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 15 }}>
-          <div className="sum-row"><span className="muted">Subtotal</span><span>{money(total)}</span></div>
-          {credit > 0 && (
-            <div className="sum-row" style={{ color: 'var(--teal-dark)', fontWeight: 600 }}>
-              <span>Gift card</span>
-              <span>−{money(credit)}</span>
-            </div>
-          )}
+          <div className="sum-row"><span className="muted">Subtotal</span><span>{money(priced)}</span></div>
           <div className="sum-row" style={{ paddingTop: 10, borderTop: '1px solid var(--hair)', fontWeight: 700, fontSize: 17 }}>
             <span>Due now</span>
             <span>{money(dueNow)}</span>
@@ -306,10 +299,10 @@ function PayView(props: {
 
       <FloatingBar
         title={when}
-        sub={dueNow > 0 ? `${money(dueLater)} due at venue` : `Pay ${money(total - credit)} at the venue`}
-        cta={busy ? 'Booking…' : dueNow > 0 ? `Pay ${money(dueNow)}` : 'Confirm booking'}
-        disabled={busy || (m !== 'venue' && dueNow > 0 && !intent)}
-        onCta={confirm}
+        sub={dueNow > 0 ? `${money(dueLater)} due at venue` : `Pay ${money(priced)} at the venue`}
+        cta={cta}
+        disabled={busy || !m || (!!booking && !intent)}
+        onCta={onCta}
       />
     </>
   );
