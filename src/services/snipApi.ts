@@ -31,6 +31,19 @@ const FRIENDLY: Record<string, string> = {
   PAY_AT_VENUE_NOT_OFFERED: 'This venue asks you to pay when you book.',
   ALREADY_PAID: 'This booking is already paid.',
   ALREADY_CANCELLED: 'This booking was already cancelled.',
+  AMOUNT_BELOW_MINIMUM: 'That deposit is too small to pay by card. Pay in full or at the venue instead.',
+  TOO_MANY_HOLDS: 'You have a few bookings waiting for payment. Finish or cancel one, then try again.',
+  TOO_MANY_UNPAID_BOOKINGS: 'You already have several bookings to pay at the venue. Pay online for this one, or cancel one you don’t need.',
+  NOTES_TOO_LONG: 'Please shorten your note to 500 characters.',
+  BOOKING_TOO_LONG: 'That’s more than 8 hours of treatments. Please book them as separate visits.',
+  SLOT_TOO_FAR: 'That date is too far ahead to book yet.',
+  SERVICE_NOT_FOUND: 'One of those treatments isn’t on the menu any more. Please choose again.',
+  SERVICE_NOT_PRICED: 'One of those treatments doesn’t have a price yet. Please contact the venue.',
+  NOTHING_TO_PAY: 'There’s nothing to pay online for this booking.',
+  NOT_CANCELLABLE: 'This booking can no longer be cancelled.',
+  PAYMENT_REQUIRED: 'Please finish paying for this booking before moving it.',
+  NOT_RESCHEDULABLE: 'This booking can no longer be moved.',
+  REFUND_FAILED: 'Your booking is cancelled, but the refund didn’t go through yet. Please try cancelling again in a moment.',
 };
 
 async function call<T>(method: 'POST' | 'DELETE', path: string, body?: unknown): Promise<T> {

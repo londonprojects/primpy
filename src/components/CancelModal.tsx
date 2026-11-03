@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Appointment, Venue } from '../types';
 import { fetchVenues } from '../services/venues';
 import { cancelAppointment } from '../services/appointments';
+import { SnipApiError } from '../services/snipApi';
 import { useUserData } from '../context/UserDataContext';
 import { appointmentTreatmentIds, bookUrl } from '../utils/booking';
 import { dayParts, money, msUntil } from '../utils/format';
@@ -45,6 +46,10 @@ export default function CancelModal({ appointment: a, onClose }: { appointment: 
       patchBooking(a.id, { status: 'cancelled' });
       onClose();
     } catch (e) {
+      // The booking is cancelled even when the refund needs retrying; show it as cancelled.
+      if (e instanceof SnipApiError && (e.code === 'REFUND_FAILED' || e.status === 503)) {
+        patchBooking(a.id, { status: 'cancelled' });
+      }
       setError(e instanceof Error ? e.message : 'Could not cancel. Please try again.');
       setBusy(false);
     }
