@@ -7,4 +7,16 @@ export default defineConfig({
   server: {
     port: 5180,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy, rarely-changing vendor code into its own cached chunks
+        // so the main app bundle stays small. (MapLibre is already lazy-loaded.)
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+        },
+      },
+    },
+  },
 });
