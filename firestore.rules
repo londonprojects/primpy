@@ -1,4 +1,7 @@
 rules_version = '2';
+// NOT DEPLOYED FROM THIS REPO. Firebase project `currentlyremote-snip` is shared by several apps, so its
+// live Firestore rules live in londonprojects/firebase-rules (projects/currentlyremote-snip/firestore.rules).
+// Edit and deploy them there. This copy is for reference and local rules tests, and may be out of date.
 
 // Snip — Firestore rules aligned with the React Native app collections.
 // Deploy to the SAME project as android/app/google-services.json (project_id) and iOS GoogleService-Info.plist.
