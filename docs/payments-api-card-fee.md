@@ -42,8 +42,8 @@ It is grossed up because Stripe takes its percentage from the whole amount charg
 `base * percent + fixed` would under-recover a few pence. £50.00 pays a £0.97 fee at 1.5% + 20p.
 
 ## Before launch
-- Set the real at-cost rate in `functions/pricing.json` and flip `cardFee.confirmed` to `true`
-  (that also shows the rate on /pricing). 1.5% + 20p is a placeholder.
+- The rate is set to 1.5% + 20p and confirmed in `functions/pricing.json` (`cardFee.confirmed: true`), which also shows it on /pricing. To change it, edit that file
+  (the site, the functions and this reference all read it).
 - A fixed rate is an estimate for cards Stripe prices differently (premium, EEA, international).
   "At cost" exactly would mean reading the actual fee from the charge afterwards and settling the
   difference. Decide which is wanted.

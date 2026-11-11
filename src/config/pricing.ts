@@ -26,8 +26,7 @@ export const PRICING = {
   /**
    * Card processing fee passed to the guest at cost when they pay online. The payments API
    * applies it (docs/payments-api-card-fee.md); the site never computes what is charged.
-   * `confirmed` stays false until the real at-cost rate is set, which keeps the figure off
-   * the public pages.
+   * The rate is only shown on the public pages while `confirmed` is true.
    */
   cardFee: values.cardFee,
   /** Prices are shown excluding VAT where applicable. */
