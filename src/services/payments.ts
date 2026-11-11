@@ -13,7 +13,10 @@ import type { PaymentMethod } from '../types';
  *
  *   POST /payments/booking-intent
  *     body { venueId, treatmentIds, date, time, method: 'deposit'|'full', promoCode? }
- *     → { clientSecret, paymentIntentId, amount }   // amount in pence
+ *     → { clientSecret, paymentIntentId, amount, cardFee? }   // pence
+ *       `amount` is the total charged now, INCLUDING the card processing fee
+ *       (passed to the guest at cost, see src/config/pricing.ts); `cardFee` is
+ *       that fee on its own so checkout can show it as a separate line.
  *   POST /payments/refund
  *     body { appointmentId } → { refunded: number } // pence
  *
@@ -57,8 +60,10 @@ async function api<T>(path: string, body: unknown): Promise<T> {
 export interface BookingIntent {
   clientSecret: string;
   paymentIntentId: string;
-  /** Pence. */
+  /** Pence, including the card processing fee. */
   amount: number;
+  /** Pence. The card processing fee inside `amount`, passed through at cost. */
+  cardFee?: number;
 }
 
 export function createBookingIntent(input: {

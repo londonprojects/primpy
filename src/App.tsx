@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Header from './components/Header';
 import TabBar from './components/TabBar';
+import Footer from './components/Footer';
 import { useUi } from './context/UiContext';
 import { useNarrow } from './hooks/useMedia';
 import HomePage from './pages/HomePage';
@@ -21,6 +22,7 @@ import SavedPage from './pages/SavedPage';
 import InboxPage from './pages/InboxPage';
 import GiftPage from './pages/GiftPage';
 import HelpPage from './pages/HelpPage';
+import PricingPage from './pages/PricingPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VerifyPage from './pages/VerifyPage';
 import ResetPage from './pages/ResetPage';
@@ -85,6 +87,7 @@ export default function App() {
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/gift" element={<GiftPage />} />
           <Route path="/help" element={<HelpPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/onboard" element={<OnboardingPage />} />
           <Route path="/verify" element={<VerifyPage />} />
           <Route path="/reset" element={<ResetPage />} />
@@ -100,6 +103,7 @@ export default function App() {
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        <Footer />
       </main>
       {narrow && <TabBar />}
     </div>

@@ -48,6 +48,9 @@ export default function Header() {
                     <button className="nav-link" onClick={() => navigate('/business/signup')}>
                       For business
                     </button>
+                    <button className="nav-link" onClick={() => navigate('/pricing')}>
+                      Pricing
+                    </button>
                   </>
                 )}
                 {user ? (

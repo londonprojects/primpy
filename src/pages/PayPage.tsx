@@ -13,6 +13,7 @@ import { LoginGate, Spinner } from '../components/ui';
 import type { PaymentMethod, Venue } from '../types';
 import { bookUrl, readBookingParams } from '../utils/booking';
 import { money, whenText } from '../utils/format';
+import { cardFee } from '../config/pricing';
 import NotFoundPage from './NotFoundPage';
 
 const appearance = {
@@ -154,9 +155,14 @@ function PayView(props: {
   const credit = Math.min(props.credit, total);
   const dep = deposit ? Math.round(total * deposit) : 0;
   const estNow = m === 'full' ? total - credit : m === 'deposit' ? Math.max(0, dep - credit) : 0;
-  // The server's amount wins once there is a PaymentIntent.
-  const dueNow = intent ? intent.amount / 100 : estNow;
-  const dueLater = Math.max(0, total - credit - dueNow);
+  // The server's amount wins once there is a PaymentIntent. `onlineBase` is the
+  // part of the booking paid online; the card fee is added on top, at cost, and
+  // only when paying online (never for "Pay at the venue").
+  const serverFee = intent?.cardFee != null ? intent.cardFee / 100 : null;
+  const onlineBase = intent ? intent.amount / 100 - (serverFee ?? 0) : estNow;
+  const fee = m === 'venue' ? 0 : serverFee ?? cardFee(onlineBase);
+  const dueNow = onlineBase + fee;
+  const dueLater = Math.max(0, total - credit - onlineBase);
   const when = whenText(params.d!, params.time);
 
   // The amount paid is recorded server-side from Stripe, never by the browser.
@@ -215,7 +221,7 @@ function PayView(props: {
 
   const off = 'Card payments aren’t set up yet';
   const opts: [PaymentMethod, string, string, boolean][] = [
-    ['venue', 'Pay at the venue', dep ? 'Not available — this venue asks for a deposit' : 'Nothing to pay today', !dep],
+    ['venue', 'Pay at the venue', dep ? 'Not available — this venue asks for a deposit' : 'Nothing to pay today · no card fee', !dep],
     ['deposit', 'Pay a deposit now', !paymentsEnabled ? off : dep ? `${money(dep)} now, the rest at the venue` : 'Not required by this venue', !!dep],
     ['full', 'Pay in full now', paymentsEnabled ? 'Settle up now and skip the till' : off, paymentsEnabled],
   ];
@@ -284,6 +290,12 @@ function PayView(props: {
             <div className="sum-row" style={{ color: 'var(--teal-dark)', fontWeight: 600 }}>
               <span>Gift card</span>
               <span>−{money(credit)}</span>
+            </div>
+          )}
+          {fee > 0 && (
+            <div className="sum-row">
+              <span className="muted">Card processing fee <span style={{ fontSize: 13 }}>(at cost, paying online)</span></span>
+              <span>{money(fee)}</span>
             </div>
           )}
           <div className="sum-row" style={{ paddingTop: 10, borderTop: '1px solid var(--hair)', fontWeight: 700, fontSize: 17 }}>
