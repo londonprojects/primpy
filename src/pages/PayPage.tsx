@@ -11,9 +11,8 @@ import { validatePromo } from '../services/stubs';
 import FloatingBar, { BarSpacer } from '../components/FloatingBar';
 import { LoginGate, Spinner } from '../components/ui';
 import type { PaymentMethod, Venue } from '../types';
-import { bookUrl, readBookingParams } from '../utils/booking';
+import { bookUrl, bookingChannel, readBookingParams } from '../utils/booking';
 import { money, whenText } from '../utils/format';
-import { cardFee } from '../config/pricing';
 import NotFoundPage from './NotFoundPage';
 
 const appearance = {
@@ -155,13 +154,13 @@ function PayView(props: {
   const credit = Math.min(props.credit, total);
   const dep = deposit ? Math.round(total * deposit) : 0;
   const estNow = m === 'full' ? total - credit : m === 'deposit' ? Math.max(0, dep - credit) : 0;
-  // The server's amount wins once there is a PaymentIntent. `onlineBase` is the
-  // part of the booking paid online; the card fee is added on top, at cost, and
-  // only when paying online (never for "Pay at the venue").
-  const serverFee = intent?.cardFee != null ? intent.cardFee / 100 : null;
-  const onlineBase = intent ? intent.amount / 100 - (serverFee ?? 0) : estNow;
-  const fee = m === 'venue' ? 0 : serverFee ?? cardFee(onlineBase);
-  const dueNow = onlineBase + fee;
+  // Once there is a PaymentIntent the server's figures are what Stripe charges, so they are
+  // the only ones shown. `amount` includes the card processing fee (passed to the guest at
+  // cost, never marked up) and `cardFee` is that fee on its own. A server that doesn't send
+  // `cardFee` yet gets no fee line rather than a guessed one. "Pay at the venue" never has one.
+  const fee = m !== 'venue' && intent?.cardFee ? intent.cardFee / 100 : 0;
+  const dueNow = intent ? intent.amount / 100 : estNow;
+  const onlineBase = intent ? dueNow - fee : estNow;
   const dueLater = Math.max(0, total - credit - onlineBase);
   const when = whenText(params.d!, params.time);
 
@@ -179,6 +178,7 @@ function PayView(props: {
       notes: params.notes,
       paymentMethod: paymentIntentId ? m : 'venue',
       paymentIntentId,
+      channel: bookingChannel(venue.id),
     });
     reloadBookings();
     navigate(`/booked/${id}`, { replace: true });

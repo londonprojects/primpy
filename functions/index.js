@@ -16,6 +16,7 @@ import { defineSecret } from 'firebase-functions/params'
 import { bookingEmails, changeKind, alertKey } from './emails.js'
 import { sendEmail } from './send.js'
 import { busyRanges, parseBusyRequest } from './availability.js'
+import { assessCommission } from './commission.js'
 import { BookingError, checkSlot, clashes, lockId, paymentFields, resolveTreatments } from './booking.js'
 
 initializeApp()
@@ -78,6 +79,55 @@ export const primpy_onAppointmentCreated = onDocumentCreated(opts, (event) =>
 
 export const primpy_onAppointmentUpdated = onDocumentUpdated(opts, (event) =>
   handle(event.params.apptId, event.data.after.ref, event.data.before.data(), event.data.after.data()))
+
+/**
+ * Commission ledger. When a booking is completed, record what the salon owes Primpy in
+ * primpyCommissions/{appointmentId} (server-only; the rules' catch-all denies client access, so a
+ * venue can't edit it). One doc per booking, created once: retries and duplicate events are no-ops.
+ * A completed booking later marked cancelled / no-show is voided. Collecting the money (taken from
+ * the online payment vs invoiced monthly) is not decided yet, so entries stay 'accrued'.
+ */
+const LEDGER = 'primpyCommissions'
+
+async function accrueCommission(id, appt) {
+  const ref = db.collection(LEDGER).doc(id)
+  const hist = await db.collection('appointments')
+    .where('barberId', '==', appt.barberId)
+    .where('customerId', '==', appt.customerId)
+    .where('status', '==', 'completed')
+    .get()
+  const history = hist.docs.map((x) => ({ id: x.id, ...x.data() }))
+  const verdict = assessCommission({ id, ...appt }, history)
+  await db.runTransaction(async (tx) => {
+    if ((await tx.get(ref)).exists) return
+    tx.create(ref, {
+      appointmentId: id,
+      venueId: appt.barberId,
+      customerId: appt.customerId,
+      date: appt.date,
+      bookingPrice: Number(appt.price) || 0,
+      ...verdict, // basis, rate, commissionPence
+      currency: 'GBP',
+      status: 'accrued',
+      collection: null, // TO CONFIRM: 'online-payment' | 'monthly-invoice'
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  })
+}
+
+export const primpy_onAppointmentStatus = onDocumentUpdated(
+  { document: 'appointments/{apptId}', region: 'europe-west2' },
+  async (event) => {
+    const before = event.data.before.data()
+    const after = event.data.after.data()
+    if (after.source !== 'primpy-web' || before.status === after.status) return
+    if (after.status === 'completed') return accrueCommission(event.params.apptId, after)
+    if (before.status === 'completed' && ['cancelled', 'no-show'].includes(after.status)) {
+      const ref = db.collection(LEDGER).doc(event.params.apptId)
+      const snap = await ref.get()
+      if (snap.exists && snap.get('status') === 'accrued') await ref.update({ status: 'void', voidedAt: FieldValue.serverTimestamp() })
+    }
+  })
 
 /**
  * Busy time ranges at a venue on a date, for the Primpy time picker. Any signed-in
@@ -153,6 +203,8 @@ export const primpy_createBooking = onCall({ region: 'europe-west2' }, async (re
         ...pay,
         createdAt: new Date().toISOString(),
         source: 'primpy-web',
+        // Set by the venue's own booking link (?ref=venue); anything else is a marketplace booking.
+        ...(d.channel === 'venue-link' ? { channel: 'venue-link' } : {}),
       })
     })
     return { id: ref.id }

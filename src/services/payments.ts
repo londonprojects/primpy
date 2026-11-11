@@ -15,8 +15,10 @@ import type { PaymentMethod } from '../types';
  *     body { venueId, treatmentIds, date, time, method: 'deposit'|'full', promoCode? }
  *     → { clientSecret, paymentIntentId, amount, cardFee? }   // pence
  *       `amount` is the total charged now, INCLUDING the card processing fee
- *       (passed to the guest at cost, see src/config/pricing.ts); `cardFee` is
- *       that fee on its own so checkout can show it as a separate line.
+ *       (passed to the guest at cost); `cardFee` is that fee on its own, in
+ *       pence, so checkout can show it as a separate line. Checkout shows only what
+ *       the server returns: no `cardFee` means no fee line. Reference implementation
+ *       and rules: docs/payments-api-card-fee.md.
  *   POST /payments/refund
  *     body { appointmentId } → { refunded: number } // pence
  *

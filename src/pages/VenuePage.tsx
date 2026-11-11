@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useVenue } from '../hooks/useVenues';
 import { fetchVenueReviews } from '../services/stubs';
@@ -10,7 +10,7 @@ import Gallery from '../components/Gallery';
 import { MapPlaceholder, Spinner } from '../components/ui';
 import { MAPTILER_KEY, MapView } from '../components/MapView';
 import { CLOSING_TIME } from '../config/slots';
-import { bookUrl, isClosed } from '../utils/booking';
+import { bookUrl, isClosed, rememberVenueLink } from '../utils/booking';
 import { fmtDur, money, todayISO } from '../utils/format';
 import NotFoundPage from './NotFoundPage';
 
@@ -31,6 +31,9 @@ export default function VenuePage() {
   const { isSaved, toggleSaved } = useUserData();
   const [tab, setTab] = useState<Tab>('treat');
   const [galOpen, setGalOpen] = useState(false);
+  useEffect(() => {
+    if (id) rememberVenueLink(id, sp);
+  }, [id, sp]);
 
   // Selection lives in the URL (?t=a,b) so Back from booking keeps it.
   const sel = (sp.get('t') ?? '').split(',').filter(Boolean);

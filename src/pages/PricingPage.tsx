@@ -17,7 +17,7 @@ export default function PricingPage() {
     ['Who counts as a new client?', `Someone your venue hasn’t completed a Primpy booking with in the last ${PRICING.newClientWindowDays} days.`],
     [`What’s always ${REPEAT_PCT}?`, 'Repeat bookings, and bookings from your own Primpy booking link, website, Google profile and social “Book now” buttons — plus clients you import or add yourself.'],
     ['Cancellations and no-shows', 'No commission on cancelled bookings or no-shows.'],
-    ['Card fees', `If a client pays online through Primpy (deposit or pay in full), the card processing fee (${cardFeeLabel()}) is passed to them at cost, with no Primpy markup. If they pay you on the day, there’s no card fee from Primpy.`],
+    ['Card fees', `If a client pays online through Primpy (deposit or pay in full), the card processing fee${cardFeeLabel() ? ` (${cardFeeLabel()})` : ''} is passed to them at cost, with no Primpy markup. If they pay you on the day, there’s no card fee from Primpy.`],
   ];
 
   return (

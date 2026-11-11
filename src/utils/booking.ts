@@ -85,3 +85,30 @@ export const STATUS_STYLE: Record<string, { text: string; bg: string; fg: string
 export function displayStatus(a: Appointment): Appointment['status'] {
   return a.status === 'scheduled' && daysFromToday(a.date) < 0 ? 'completed' : a.status;
 }
+
+/**
+ * Attribution for the venue's own links. A venue shares `/venue/<id>?ref=venue`; we remember
+ * that for the browser session so the booking is tagged 'venue-link' (0% commission) even
+ * after the login step. Marketplace visits carry no ref and are tagged by the server.
+ */
+const refKey = (venueId: string) => `primpy:ref:${venueId}`;
+
+export function rememberVenueLink(venueId: string, sp: URLSearchParams): void {
+  if (sp.get('ref') !== 'venue') return;
+  try {
+    sessionStorage.setItem(refKey(venueId), 'venue-link');
+  } catch {
+    /* storage unavailable: the booking is then treated as a marketplace one */
+  }
+}
+
+export function bookingChannel(venueId: string): 'venue-link' | undefined {
+  try {
+    return sessionStorage.getItem(refKey(venueId)) === 'venue-link' ? 'venue-link' : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The link a venue shares from its own website, Google profile and social "Book now" buttons. */
+export const venueLink = (venueId: string) => `${window.location.origin}/venue/${venueId}?ref=venue`;

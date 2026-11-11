@@ -9,26 +9,31 @@
  *   through to them at cost, with no Primpy markup. Paying at the venue has no
  *   Primpy card fee at all.
  *
- * Everything on /pricing, /business/signup, the business dashboard, the help
+ * The numbers themselves live in functions/pricing.json so the Cloud Functions commission
+ * ledger reads the very same values. Everything on /pricing, /business/signup, the business dashboard, the help
  * FAQ and the checkout reads from here, so change a value once and it updates
  * everywhere.
  */
+import values from '../../functions/pricing.json';
+
 export const PRICING = {
   /** Commission on a new client's first completed Primpy marketplace booking (0.15 = 15%). */
-  newClientCommission: 0.15,
+  newClientCommission: values.newClientCommission,
   /** Commission on repeat bookings and on the venue's own links / imported clients. */
-  repeatCommission: 0,
+  repeatCommission: values.repeatCommission,
   /** A client is "new" if the venue hasn't completed a Primpy booking with them in this many days. */
-  newClientWindowDays: 365,
+  newClientWindowDays: values.newClientWindowDays,
   /**
-   * Card processing fee passed through at cost to the guest when they pay online.
-   * TO CONFIRM: set to the processor's actual rate before launch.
+   * Card processing fee passed to the guest at cost when they pay online. The payments API
+   * applies it (docs/payments-api-card-fee.md); the site never computes what is charged.
+   * `confirmed` stays false until the real at-cost rate is set, which keeps the figure off
+   * the public pages.
    */
-  cardFee: { percent: 0.015, fixed: 0.2 },
+  cardFee: values.cardFee,
   /** Prices are shown excluding VAT where applicable. */
   vatNote: 'Prices exclude VAT where applicable.',
   /** Treatment price used in the worked example on /pricing. */
-  exampleTreatment: 50,
+  exampleTreatment: values.exampleTreatment,
 } as const;
 
 /** "15%" style label for a fraction. */
@@ -40,18 +45,12 @@ export function pct(n: number): string {
 export const COMMISSION_PCT = pct(PRICING.newClientCommission);
 export const REPEAT_PCT = pct(PRICING.repeatCommission);
 
-/** Card fee label, e.g. "1.5% + 20p". */
-export function cardFeeLabel(): string {
-  const { percent, fixed } = PRICING.cardFee;
+/** Card fee label like "1.5% + 20p", or null until the rate is confirmed. */
+export function cardFeeLabel(): string | null {
+  const { percent, fixed, confirmed } = PRICING.cardFee;
+  if (!confirmed) return null;
   const f = fixed ? ` + ${fixed < 1 ? `${Math.round(fixed * 100)}p` : `£${fixed.toFixed(2)}`}` : '';
   return `${pct(percent)}${f}`;
-}
-
-/** Card processing fee (pounds, to the penny) for an online payment of `amount` pounds. */
-export function cardFee(amount: number): number {
-  if (amount <= 0) return 0;
-  const { percent, fixed } = PRICING.cardFee;
-  return Math.round((amount * percent + fixed) * 100) / 100;
 }
 
 /** Salon commission (pounds) on a new client's first Primpy booking of `amount` pounds. */
