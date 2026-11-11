@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useUi } from '../../context/UiContext';
 import { authErrorMessage } from '../../utils/authError';
+import { RATE_LINE } from '../../config/pricing';
 
 /** Standalone "list your venue" sign-up for business (barber) accounts. */
 export default function BusinessSignupPage() {
@@ -45,7 +46,8 @@ export default function BusinessSignupPage() {
           List your venue on Primpy
         </h1>
         <p className="muted" style={{ fontSize: 15, margin: '0 0 24px' }}>
-          Create a business account to manage your treatments and take bookings.
+          Create a business account to manage your treatments and take bookings.{' '}
+          <Link to="/pricing" style={{ fontWeight: 700 }}>See pricing</Link>
         </p>
 
         <form className="card card-pad-lg" onSubmit={submit}>
@@ -66,6 +68,10 @@ export default function BusinessSignupPage() {
             Password
             <input className="input h50" type="password" autoComplete="new-password" value={pw} placeholder="6+ characters" onChange={(e) => { setPw(e.target.value); setError(''); }} />
           </label>
+          <p className="banner-teal" style={{ margin: '0 0 14px' }}>
+            {RATE_LINE}{' '}
+            <Link to="/pricing" style={{ fontWeight: 700, textDecoration: 'underline' }}>How pricing works</Link>
+          </p>
           <button className="btn btn-teal btn-block h54 btn-bold" disabled={busy}>
             {busy ? 'Creating account…' : 'Create business account'}
           </button>

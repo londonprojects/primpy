@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "test": "node --test test/*.test.js",
-    "lint": "node --check index.js && node --check emails.js && node --check send.js && node --check availability.js && node --check booking.js"
+    "lint": "node --check index.js && node --check emails.js && node --check send.js && node --check availability.js && node --check booking.js && node --check pricing.js && node --check commission.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

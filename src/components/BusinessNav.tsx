@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { RATE_LINE } from '../config/pricing';
 import { useAuth } from '../context/AuthContext';
 
 const tabs = [
@@ -32,6 +33,10 @@ export default function BusinessNav() {
           </button>
         </div>
       </div>
+      <p className="banner-teal" style={{ margin: '0 0 18px' }}>
+        {RATE_LINE}{' '}
+        <Link to="/pricing" style={{ fontWeight: 700, textDecoration: 'underline' }}>Pricing</Link>
+      </p>
       <div className="biz-nav">
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} className={({ isActive }) => `biz-tab${isActive ? ' on' : ''}`}>

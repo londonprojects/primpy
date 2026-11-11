@@ -1,0 +1,7 @@
+{
+  "newClientCommission": 0.15,
+  "repeatCommission": 0,
+  "newClientWindowDays": 365,
+  "cardFee": { "percent": 0.015, "fixed": 0.2, "confirmed": true },
+  "exampleTreatment": 50
+}

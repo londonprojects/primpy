@@ -27,13 +27,15 @@ export interface NewBooking {
   paymentMethod: PaymentMethod;
   /** Required for 'deposit' / 'full'; the payments server records the amount once Stripe confirms it. */
   paymentIntentId?: string;
+  /** 'venue-link' when the guest arrived via the venue's own booking link (0% commission). */
+  channel?: 'venue-link';
 }
 
 /** True when a callable isn't deployed yet (our functions never answer 'not-found' themselves). */
 const notDeployed = (e: unknown) => (e as { code?: string })?.code === 'functions/not-found';
 
 const createBookingFn = httpsCallable<
-  { venueId: string; treatmentIds: string[]; date: string; time: string; notes?: string; paymentMethod: PaymentMethod; paymentIntentId?: string },
+  { venueId: string; treatmentIds: string[]; date: string; time: string; notes?: string; paymentMethod: PaymentMethod; paymentIntentId?: string; channel?: 'venue-link' },
   { id: string }
 >(functions, 'primpy_createBooking');
 
@@ -65,6 +67,7 @@ export async function createAppointment(booking: NewBooking): Promise<string> {
       notes: booking.notes,
       paymentMethod: booking.paymentMethod,
       paymentIntentId: booking.paymentIntentId,
+      channel: booking.channel,
     });
     return data.id;
   } catch (e) {

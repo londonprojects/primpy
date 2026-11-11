@@ -32,6 +32,7 @@ amber / ink tokens in `src/index.css`, one breakpoint at 760px (bottom tab bar, 
 | `/appointments`, `/booking/:id`, `/review/:id` | My bookings, detail, write a review |
 | `/account`, `/account/payments`, `/account/privacy` | Account |
 | `/saved`, `/inbox`, `/gift`, `/help` | Saved, inbox, gift cards, help |
+| `/pricing` | Partner pricing for venues (public) |
 | `/onboard`, `/verify`, `/reset` | After sign-up, email verification, emailed-link landing |
 | `/login`, `/register` | Open the auth modal (kept for deep links) |
 
@@ -65,6 +66,20 @@ venue's `barberServices`, check the slot (listed times, Mon–Sat, within 14 day
 time) and take a per-venue-day lock (`primpySlotLocks`) inside a transaction, so two people can't
 book the same time. The rules refuse direct Primpy creates; customers may only cancel directly.
 Bookings made in the Snip app don't take the lock.
+
+## Partner pricing
+
+The salon pays Primpy's commission; the guest never does. 15% once, on a new client's first completed
+Primpy marketplace booking; 0% on repeat bookings, the venue's own links (`/venue/<id>?ref=venue`,
+shown on the business Venue profile tab), clients the venue already has outside Primpy, cancellations
+and no-shows. Guests pay a card fee at cost only when they pay online.
+
+- Values (15%, 365 days, card fee rate): `functions/pricing.json`, the one place to change them. The
+  site reads it via `src/config/pricing.ts`, the functions via `functions/pricing.js`.
+- Commission ledger: `primpy_onAppointmentStatus` writes `primpyCommissions/{appointmentId}` (server-only)
+  when a booking is completed; rules in `functions/commission.js`. Entries stay `accrued`. Collection
+  (from the online payment vs invoiced monthly) is TO CONFIRM and not built.
+- Card fee: applied by the payments API, see `docs/payments-api-card-fee.md`.
 
 ## Getting started
 

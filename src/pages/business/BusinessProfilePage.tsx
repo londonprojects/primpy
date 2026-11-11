@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import BusinessNav from '../../components/BusinessNav';
 import { Spinner } from '../../components/ui';
+import { venueLink } from '../../utils/booking';
 import { fetchVenueProfile, saveVenueProfile, type VenueProfileForm } from '../../services/business';
 
 const EMPTY: VenueProfileForm = { shopName: '', bio: '', phone: '', addressLine1: '', city: '', region: '' };
@@ -12,6 +13,7 @@ export default function BusinessProfilePage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -43,6 +45,27 @@ export default function BusinessProfilePage() {
   return (
     <div className="wrap w880 page">
       <BusinessNav />
+      {user && (
+        <div className="card card-pad-lg" style={{ marginBottom: 16 }}>
+          <h2 className="h-card" style={{ marginBottom: 6 }}>Your booking link</h2>
+          <p className="muted" style={{ fontSize: 14, margin: '0 0 12px', lineHeight: 1.45 }}>
+            Use this on your website, Google profile and social “Book now” buttons. Bookings from it are always 0% commission.
+          </p>
+          <div className="row" style={{ gap: 8 }}>
+            <input className="input h50" readOnly value={venueLink(user.id)} onFocus={(e) => e.target.select()} style={{ flex: '1 1 260px', width: 'auto' }} />
+            <button
+              className="btn btn-ink btn-sm h50 btn-bold"
+              style={{ padding: '0 20px', fontSize: 15 }}
+              onClick={() => {
+                navigator.clipboard?.writeText(venueLink(user.id)).then(() => setCopied(true), () => undefined);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+          </div>
+        </div>
+      )}
       {loading ? (
         <Spinner />
       ) : (
